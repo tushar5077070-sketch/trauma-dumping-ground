@@ -3,6 +3,7 @@ import { Sparkles, Heart } from 'lucide-react';
 import { SEED_OPTIONS, Story } from '../types/garden';
 import { soundscape } from '../utils/soundscape';
 import { MeadowFlowerSvg } from './FlowerIllustration';
+import cleanMeadowSkyImg from '../assets/images/clean_meadow_sky_1794588674441.jpg';
 
 interface LivingGardenCanvasProps {
   stories: Story[];
@@ -24,7 +25,6 @@ interface GrassBlade {
   velocity: number;
   layer: 0 | 1 | 2;
   isFoxtail: boolean;
-  blossomType: 'blue' | 'yellow' | 'pink' | 'lavender' | null;
 }
 
 interface AtmosphericParticle {
@@ -198,39 +198,32 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
     updateCanvasSize();
     window.addEventListener('resize', updateCanvasSize);
 
-    // Native 1280 x 653 proportional landscape buffer (zero aspect ratio distortion)
+    // Upright 16:9 flower-free meadow landscape buffer (zero background flowers, zero distortion)
     const offscreenLandscape = document.createElement('canvas');
-    offscreenLandscape.width = 1280;
-    offscreenLandscape.height = 653;
+    offscreenLandscape.width = 1408;
+    offscreenLandscape.height = 768;
     let isPhotoLoaded = false;
+    let topSkyColor = '#53B2ED';
 
     const refImage = new Image();
     refImage.crossOrigin = 'anonymous';
-    refImage.src =
-      '/assets/aistudio/WhatsApp_Image_2026-11-04_at_23.23.46_8e9dddc2.jpeg';
+    refImage.src = cleanMeadowSkyImg;
     refImage.onload = () => {
+      const w = refImage.naturalWidth || 1408;
+      const h = refImage.naturalHeight || 768;
+      offscreenLandscape.width = w;
+      offscreenLandscape.height = h;
       const oCtx = offscreenLandscape.getContext('2d');
       if (!oCtx) return;
-      const w = offscreenLandscape.width; // 1280
-      const h = offscreenLandscape.height; // 653
 
-      oCtx.save();
-      oCtx.translate(w / 2, h / 2);
-      oCtx.rotate(-Math.PI / 2);
-      // Native image is 653 x 1280. Scale uniformly by 1.09x to crop out the top edge watermark without stretching!
-      const uniformScale = 1.09;
-      const drawW = h * uniformScale;
-      const drawH = w * uniformScale;
-      oCtx.drawImage(refImage, -drawW / 2 - 28, -drawH / 2, drawW, drawH);
-      oCtx.restore();
+      oCtx.drawImage(refImage, 0, 0, w, h);
 
-      // Seamless sky zenith blend to ensure zero watermark text
-      const skyCleanGrad = oCtx.createLinearGradient(0, 0, 0, h * 0.16);
-      skyCleanGrad.addColorStop(0, '#49A0DC');
-      skyCleanGrad.addColorStop(0.55, '#52A7E0');
-      skyCleanGrad.addColorStop(1, 'rgba(82, 167, 224, 0)');
-      oCtx.fillStyle = skyCleanGrad;
-      oCtx.fillRect(0, 0, w, h * 0.16);
+      try {
+        const px = oCtx.getImageData(Math.floor(w * 0.25), 2, 1, 1).data;
+        topSkyColor = `rgb(${px[0]}, ${px[1]}, ${px[2]})`;
+      } catch {
+        topSkyColor = '#53B2ED';
+      }
 
       isPhotoLoaded = true;
     };
@@ -262,12 +255,6 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
           : 82 + Math.random() * 68;
 
       const pal = grassPalette[(i + layer) % grassPalette.length];
-      const roll = Math.random();
-      let blossomType: GrassBlade['blossomType'] = null;
-      if (roll < 0.11) blossomType = 'blue';
-      else if (roll < 0.19) blossomType = 'yellow';
-      else if (roll < 0.27) blossomType = 'pink';
-      else if (roll < 0.34) blossomType = 'lavender';
 
       blades.push({
         xRatio,
@@ -282,8 +269,7 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         currentAngle: 0,
         velocity: 0,
         layer,
-        isFoxtail: !blossomType && Math.random() < 0.14,
-        blossomType,
+        isFoxtail: Math.random() < 0.12,
       });
     }
 
@@ -428,48 +414,6 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         targetCtx.fill();
         targetCtx.restore();
       }
-
-      if (b.blossomType) {
-        targetCtx.save();
-        targetCtx.translate(tipX, tipY);
-        if (b.blossomType === 'blue') {
-          targetCtx.fillStyle = '#80C4FF';
-          for (let p = 0; p < 5; p++) {
-            const a = (p * Math.PI * 2) / 5;
-            targetCtx.beginPath();
-            targetCtx.arc(
-              Math.cos(a) * 3.2,
-              Math.sin(a) * 3.2,
-              2.2,
-              0,
-              Math.PI * 2
-            );
-            targetCtx.fill();
-          }
-          targetCtx.fillStyle = '#FFF7A8';
-          targetCtx.beginPath();
-          targetCtx.arc(0, 0, 1.5, 0, Math.PI * 2);
-          targetCtx.fill();
-        } else if (b.blossomType === 'yellow') {
-          targetCtx.fillStyle = '#FFE45E';
-          targetCtx.beginPath();
-          targetCtx.arc(0, 0, 3.5, 0, Math.PI * 2);
-          targetCtx.fill();
-        } else if (b.blossomType === 'pink') {
-          targetCtx.fillStyle = '#FAD0DF';
-          targetCtx.beginPath();
-          targetCtx.arc(0, 0, 3.8, 0, Math.PI * 2);
-          targetCtx.fill();
-        } else if (b.blossomType === 'lavender') {
-          targetCtx.fillStyle = '#E2BAFA';
-          targetCtx.beginPath();
-          targetCtx.arc(0, -2, 3.0, 0, Math.PI * 2);
-          targetCtx.arc(-2, 2, 2.5, 0, Math.PI * 2);
-          targetCtx.arc(2, 2, 2.5, 0, Math.PI * 2);
-          targetCtx.fill();
-        }
-        targetCtx.restore();
-      }
     };
 
     const render = (timeMs: number) => {
@@ -527,15 +471,15 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
 
         // Center horizontally & anchor meadow bottom so the horizon aligns consistently across mobile, tablet, and desktop
         const destX = (width - destW) * 0.5 + baseParallaxX;
-        const rawDestY = height * 0.55 - destH * 0.54 + baseParallaxY;
+        const rawDestY = height * 0.55 - destH * 0.58 + baseParallaxY;
         const minBottomAlignedY = height + padY - destH + baseParallaxY;
         const destY = Math.max(rawDestY, minBottomAlignedY);
 
         // Seamlessly fill upper zenith sky if portrait/tablet screen extends above destY
         if (destY > 0) {
           const zenithGrad = bgCtx.createLinearGradient(0, 0, 0, destY + 4);
-          zenithGrad.addColorStop(0, '#4197D7');
-          zenithGrad.addColorStop(1, '#49A0DC');
+          zenithGrad.addColorStop(0, '#45A2E0');
+          zenithGrad.addColorStop(1, topSkyColor);
           bgCtx.fillStyle = zenithGrad;
           bgCtx.fillRect(0, 0, width, destY + 4);
         }
@@ -556,7 +500,7 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         // 1B. Smoothstep wind-swaying lower meadow strips preserving exact cover aspect ratio
         if (!prefersReducedMotion) {
           const strips = 28;
-          const startRatio = 0.52;
+          const startRatio = 0.59;
           const endRatio = 1.0;
 
           for (let s = 0; s < strips; s++) {

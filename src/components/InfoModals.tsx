@@ -108,10 +108,10 @@ export const InfoModals: React.FC<InfoModalProps> = ({
 
               <div className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200/70">
                 <h3 className="text-sm font-semibold text-slate-900">
-                  02. Choose Your Seed
+                  02. Click “Plant a Seed 🌱” & Choose Your Seed
                 </h3>
                 <p className="text-xs text-slate-600 mt-1 mb-3 leading-relaxed">
-                  Use the seed selector on the right side of the sky to choose the symbol that best reflects what you are releasing today:
+                  Click “Plant a Seed” to open the writing sanctuary and select the seed that best reflects what you are releasing today:
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {SEED_OPTIONS.map((seed) => (

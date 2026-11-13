@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Story } from '../types/garden';
+import { Sparkles, Heart } from 'lucide-react';
+import { SEED_OPTIONS, Story } from '../types/garden';
 import { soundscape } from '../utils/soundscape';
 import { MeadowFlowerSvg } from './FlowerIllustration';
 
@@ -50,48 +51,94 @@ interface Butterfly {
   scale: number;
 }
 
+interface FlowerSpringState {
+  angle: number;
+  velocity: number;
+  scale: number;
+  scaleVelocity: number;
+  phase: number;
+  speed: number;
+  naturalScale: number;
+}
+
 export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
   stories,
   onSelectStory,
   highlightedStoryId,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const bgCanvasRef = useRef<HTMLCanvasElement>(null);
+  const fgCanvasRef = useRef<HTMLCanvasElement>(null);
+  const flowersLayerRef = useRef<HTMLDivElement>(null);
+  const popupLayerRef = useRef<HTMLDivElement>(null);
+  const popupCardRef = useRef<HTMLDivElement>(null);
+
+  const flowerVisualRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const [hoveredStoryId, setHoveredStoryId] = useState<string | null>(null);
-  const [cursorParallax, setCursorParallax] = useState({ x: 0, y: 0 });
-  const [flowerBends, setFlowerBends] = useState<Record<string, number>>({});
+  const hoveredStoryIdRef = useRef<string | null>(null);
+  const highlightedStoryIdRef = useRef<string | null>(
+    highlightedStoryId || null
+  );
 
-  const pointerRef = useRef<{ x: number; y: number; active: boolean }>({
+  useEffect(() => {
+    hoveredStoryIdRef.current = hoveredStoryId;
+  }, [hoveredStoryId]);
+
+  useEffect(() => {
+    highlightedStoryIdRef.current = highlightedStoryId || null;
+  }, [highlightedStoryId]);
+
+  // Smoothly interpolated pointer & parallax state (no React re-render on mousemove)
+  const pointerRef = useRef<{
+    x: number;
+    y: number;
+    smoothX: number;
+    smoothY: number;
+    parallaxX: number;
+    parallaxY: number;
+    active: boolean;
+  }>({
     x: -9999,
     y: -9999,
+    smoothX: -9999,
+    smoothY: -9999,
+    parallaxX: 0,
+    parallaxY: 0,
     active: false,
   });
 
-  const springStateRef = useRef<
-    Record<string, { angle: number; velocity: number; phase: number; speed: number }>
-  >({});
+  const springStateRef = useRef<Record<string, FlowerSpringState>>({});
 
-  // Sync spring physics states for all stories
+  // Initialize spring physics states for all stories
   useEffect(() => {
     const current = springStateRef.current;
     stories.forEach((story, idx) => {
+      const natScale = Number((story.scale * 0.76).toFixed(3));
       if (!current[story.storyId]) {
         current[story.storyId] = {
           angle: 0,
           velocity: 0,
+          scale: natScale,
+          scaleVelocity: 0,
           phase: idx * 1.17,
           speed: 1.05 + (idx % 5) * 0.14,
+          naturalScale: natScale,
         };
+      } else {
+        current[story.storyId].naturalScale = natScale;
       }
     });
   }, [stories]);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d', { alpha: false });
-    if (!ctx) return;
+    const bgCanvas = bgCanvasRef.current;
+    const fgCanvas = fgCanvasRef.current;
+    if (!bgCanvas || !fgCanvas) return;
+
+    const bgCtx = bgCanvas.getContext('2d', { alpha: false });
+    const fgCtx = fgCanvas.getContext('2d', { alpha: true });
+    if (!bgCtx || !fgCtx) return;
 
     const prefersReducedMotion = window.matchMedia(
       '(prefers-reduced-motion: reduce)'
@@ -105,14 +152,19 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       width = window.innerWidth;
       height = window.innerHeight;
-      canvas.width = Math.floor(width * dpr);
-      canvas.height = Math.floor(height * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      bgCanvas.width = Math.floor(width * dpr);
+      bgCanvas.height = Math.floor(height * dpr);
+      bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      fgCanvas.width = Math.floor(width * dpr);
+      fgCanvas.height = Math.floor(height * dpr);
+      fgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
     updateCanvasSize();
     window.addEventListener('resize', updateCanvasSize);
 
-    // Load the reference meadow photograph & orient it into a crisp landscape offscreen canvas
+    // Prepare seamless landscape offscreen buffer with the "overwater" watermark completely removed
     const offscreenLandscape = document.createElement('canvas');
     offscreenLandscape.width = 1600;
     offscreenLandscape.height = 900;
@@ -127,20 +179,25 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
       if (!oCtx) return;
       const w = offscreenLandscape.width;
       const h = offscreenLandscape.height;
+
       oCtx.save();
-      // The uploaded image is rotated 90deg CW (portrait 653x1280).
-      // Rotating -90deg CCW places the blue sky & cumulus clouds at top and the flower meadow at bottom.
       oCtx.translate(w / 2, h / 2);
       oCtx.rotate(-Math.PI / 2);
-      // Slight 1.08x zoom crops the tiny watermark on the right sky edge and fills 16:9 cleanly
-      const drawW = h * 1.08;
+      const drawW = h * 1.18;
       const drawH = w * 1.08;
-      oCtx.drawImage(refImage, -drawW / 2 - 22, -drawH / 2, drawW, drawH);
+      oCtx.drawImage(refImage, -drawW / 2 - 78, -drawH / 2, drawW, drawH);
       oCtx.restore();
+
+      const skyCleanGrad = oCtx.createLinearGradient(0, 0, 0, h * 0.18);
+      skyCleanGrad.addColorStop(0, '#49A0DC');
+      skyCleanGrad.addColorStop(0.55, '#52A7E0');
+      skyCleanGrad.addColorStop(1, 'rgba(82, 167, 224, 0)');
+      oCtx.fillStyle = skyCleanGrad;
+      oCtx.fillRect(0, 0, w, h * 0.18);
+
       isPhotoLoaded = true;
     };
 
-    // Foreground & Mid-ground High-Detail Grass & Wildflower Blades
     const grassPalette = [
       { base: '#346320', lit: '#689E48' },
       { base: '#44782C', lit: '#82B85D' },
@@ -184,7 +241,7 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         highlightColor: pal.lit,
         phase: Math.random() * Math.PI * 2,
         speed: 1.0 + Math.random() * 0.85,
-        stiffness: 0.08 + Math.random() * 0.04,
+        stiffness: 0.075 + Math.random() * 0.035,
         currentAngle: 0,
         velocity: 0,
         layer,
@@ -193,7 +250,6 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
       });
     }
 
-    // Atmospheric VFX Particles: Golden Pollen, Floating Petals, Dandelion Seeds, and Lens Bokeh
     const particles: AtmosphericParticle[] = Array.from({ length: 64 }).map(
       (_, i) => {
         const kindRoll = Math.random();
@@ -230,7 +286,6 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
       }
     );
 
-    // 3 Fluttering Meadow Butterflies
     const butterflies: Butterfly[] = [
       {
         x: width * 0.25,
@@ -265,105 +320,238 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
     ];
 
     let animationFrameId: number;
-    let lastSpringSync = 0;
+
+    const drawGrassBlade = (
+      targetCtx: CanvasRenderingContext2D,
+      b: GrassBlade,
+      t: number,
+      ptr: typeof pointerRef.current
+    ) => {
+      const baseX = b.xRatio * width;
+      const baseY = height - b.yOffsetRatio * (height * 0.44);
+
+      const windWave = prefersReducedMotion
+        ? 2
+        : Math.sin(t * b.speed + b.xRatio * 5.8 + b.phase) * 9 +
+          Math.cos(t * 0.7 + b.xRatio * 3.2) * 4 +
+          3;
+
+      // Smooth bell-derivative repulsion (passes smoothly through 0 at dx=0, never snaps!)
+      let cursorPush = 0;
+      if (ptr.active && !prefersReducedMotion) {
+        const dx = baseX - ptr.smoothX;
+        const dy = baseY - b.height * 0.5 - ptr.smoothY;
+        const radius = 155;
+        const distSq = dx * dx + dy * dy;
+        const rSq = radius * radius;
+        if (distSq < rSq) {
+          const falloff = Math.pow(1 - distSq / rSq, 2);
+          cursorPush = (dx / radius) * falloff * 52;
+        }
+      }
+
+      const targetAngle = windWave + cursorPush;
+      const accel = (targetAngle - b.currentAngle) * b.stiffness;
+      b.velocity = (b.velocity + accel) * 0.8;
+      b.currentAngle += b.velocity;
+
+      const rad = (b.currentAngle * Math.PI) / 180;
+      const tipX = baseX + Math.sin(rad) * b.height;
+      const tipY = baseY - Math.cos(rad) * b.height;
+      const ctrlX = baseX + Math.sin(rad * 0.5) * (b.height * 0.55);
+      const ctrlY = baseY - b.height * 0.52;
+
+      const bladeGrad = targetCtx.createLinearGradient(
+        baseX,
+        baseY,
+        tipX,
+        tipY
+      );
+      bladeGrad.addColorStop(0, b.color);
+      bladeGrad.addColorStop(1, b.highlightColor);
+
+      targetCtx.beginPath();
+      targetCtx.moveTo(baseX - b.width * 0.5, baseY);
+      targetCtx.quadraticCurveTo(ctrlX, ctrlY, tipX, tipY);
+      targetCtx.quadraticCurveTo(
+        ctrlX + b.width * 0.35,
+        ctrlY,
+        baseX + b.width * 0.5,
+        baseY
+      );
+      targetCtx.fillStyle = bladeGrad;
+      targetCtx.fill();
+
+      if (b.isFoxtail) {
+        targetCtx.save();
+        targetCtx.translate(tipX, tipY);
+        targetCtx.rotate(rad);
+        targetCtx.fillStyle = 'rgba(235, 248, 185, 0.78)';
+        targetCtx.beginPath();
+        targetCtx.ellipse(0, -6, 2.8, 9.5, 0, 0, Math.PI * 2);
+        targetCtx.fill();
+        targetCtx.restore();
+      }
+
+      if (b.blossomType) {
+        targetCtx.save();
+        targetCtx.translate(tipX, tipY);
+        if (b.blossomType === 'blue') {
+          targetCtx.fillStyle = '#80C4FF';
+          for (let p = 0; p < 5; p++) {
+            const a = (p * Math.PI * 2) / 5;
+            targetCtx.beginPath();
+            targetCtx.arc(
+              Math.cos(a) * 3.2,
+              Math.sin(a) * 3.2,
+              2.2,
+              0,
+              Math.PI * 2
+            );
+            targetCtx.fill();
+          }
+          targetCtx.fillStyle = '#FFF7A8';
+          targetCtx.beginPath();
+          targetCtx.arc(0, 0, 1.5, 0, Math.PI * 2);
+          targetCtx.fill();
+        } else if (b.blossomType === 'yellow') {
+          targetCtx.fillStyle = '#FFE45E';
+          targetCtx.beginPath();
+          targetCtx.arc(0, 0, 3.5, 0, Math.PI * 2);
+          targetCtx.fill();
+        } else if (b.blossomType === 'pink') {
+          targetCtx.fillStyle = '#FAD0DF';
+          targetCtx.beginPath();
+          targetCtx.arc(0, 0, 3.8, 0, Math.PI * 2);
+          targetCtx.fill();
+        } else if (b.blossomType === 'lavender') {
+          targetCtx.fillStyle = '#E2BAFA';
+          targetCtx.beginPath();
+          targetCtx.arc(0, -2, 3.0, 0, Math.PI * 2);
+          targetCtx.arc(-2, 2, 2.5, 0, Math.PI * 2);
+          targetCtx.arc(2, 2, 2.5, 0, Math.PI * 2);
+          targetCtx.fill();
+        }
+        targetCtx.restore();
+      }
+    };
 
     const render = (timeMs: number) => {
       const t = timeMs * 0.001;
       const ptr = pointerRef.current;
 
-      const normPtrX = ptr.active ? ptr.x / width - 0.5 : 0;
-      const normPtrY = ptr.active ? ptr.y / height - 0.5 : 0;
+      // Smoothly low-pass filter pointer coordinates & parallax so rapid mouse flicks never glitch
+      if (ptr.active) {
+        if (ptr.smoothX < -1000) {
+          ptr.smoothX = ptr.x;
+          ptr.smoothY = ptr.y;
+        } else {
+          ptr.smoothX += (ptr.x - ptr.smoothX) * 0.18;
+          ptr.smoothY += (ptr.y - ptr.smoothY) * 0.18;
+        }
+        const targetPx = (ptr.smoothX / width - 0.5) * 18;
+        const targetPy = (ptr.smoothY / height - 0.5) * 10;
+        ptr.parallaxX += (targetPx - ptr.parallaxX) * 0.08;
+        ptr.parallaxY += (targetPy - ptr.parallaxY) * 0.08;
+      } else {
+        ptr.parallaxX += (0 - ptr.parallaxX) * 0.06;
+        ptr.parallaxY += (0 - ptr.parallaxY) * 0.06;
+      }
+
+      // Apply smooth GPU parallax to the DOM flower & popup layers directly
+      const layerTransform = `translate3d(${(ptr.parallaxX * 0.72).toFixed(
+        2
+      )}px, ${(ptr.parallaxY * 0.28).toFixed(2)}px, 0)`;
+      if (flowersLayerRef.current) {
+        flowersLayerRef.current.style.transform = layerTransform;
+      }
+      if (popupLayerRef.current) {
+        popupLayerRef.current.style.transform = layerTransform;
+      }
+
+      fgCtx.clearRect(0, 0, width, height);
 
       if (isPhotoLoaded) {
-        // 1A. Draw Upper Sky & Cumulus Horizon with smooth parallax
         const srcW = offscreenLandscape.width;
         const srcH = offscreenLandscape.height;
-        const padX = 28;
-        const padY = 18;
-        const skyParallaxX = -normPtrX * 16 + Math.sin(t * 0.18) * 6;
-        const skyParallaxY = -normPtrY * 10;
+        const padX = 32;
+        const padY = 20;
 
-        ctx.drawImage(
+        const baseParallaxX = -ptr.parallaxX * 0.75 + Math.sin(t * 0.18) * 4;
+        const baseParallaxY = -ptr.parallaxY * 0.75;
+
+        // 1A. Continuous full-screen base pass (zero seam line)
+        bgCtx.drawImage(
           offscreenLandscape,
           0,
           0,
           srcW,
-          srcH * 0.54,
-          -padX + skyParallaxX,
-          -padY + skyParallaxY,
+          srcH,
+          -padX + baseParallaxX,
+          -padY + baseParallaxY,
           width + padX * 2,
-          height * 0.55 + padY
+          height + padY * 2
         );
 
-        // 1B. Draw Lower Flower Meadow with Real-Time Wind Ripple & Cursor Parting Displacement
-        const strips = 36;
-        const meadowStartRatio = 0.45;
-        const meadowEndRatio = 1.0;
+        // 1B. Smoothstep wind-swaying lower meadow strips
+        if (!prefersReducedMotion) {
+          const strips = 32;
+          const startRatio = 0.52;
+          const endRatio = 1.0;
+          const totalDestH = height + padY * 2;
+          const baseDestY = -padY + baseParallaxY;
 
-        for (let s = 0; s < strips; s++) {
-          const frac0 = s / strips;
-          const frac1 = (s + 1) / strips;
-          const rY0 = meadowStartRatio + frac0 * (meadowEndRatio - meadowStartRatio);
-          const rY1 = meadowStartRatio + frac1 * (meadowEndRatio - meadowStartRatio);
+          for (let s = 0; s < strips; s++) {
+            const frac0 = s / strips;
+            const frac1 = (s + 1) / strips;
+            const rY0 = startRatio + frac0 * (endRatio - startRatio);
+            const rY1 = startRatio + frac1 * (endRatio - startRatio);
 
-          const sy = rY0 * srcH;
-          const sh = (rY1 - rY0) * srcH + 1.5;
+            const sy = rY0 * srcH;
+            const sh = (rY1 - rY0) * srcH + 2;
 
-          const dy = rY0 * height;
-          const dh = (rY1 - rY0) * height + 1.5;
+            const dy = baseDestY + rY0 * totalDestH;
+            const dh = (rY1 - rY0) * totalDestH + 2;
 
-          // Wind wave increases toward foreground strips
-          const depthWeight = Math.pow(frac0, 1.25);
-          const windShift = prefersReducedMotion
-            ? 0
-            : Math.sin(t * 1.65 - frac0 * 4.8) * (7.5 * depthWeight) +
-              Math.cos(t * 0.9 + frac0 * 3.1) * (3.5 * depthWeight);
+            const smoothWeight = frac0 * frac0 * (3 - 2 * frac0);
 
-          // Subtle cursor ripple in the meadow
-          let cursorShift = 0;
-          if (ptr.active && !prefersReducedMotion) {
-            const distY = Math.abs(dy - ptr.y);
-            if (distY < 130) {
-              const wy = 1 - distY / 130;
-              cursorShift = Math.sin((ptr.x / width) * Math.PI * 2) * wy * 5.5;
-            }
+            const windShift =
+              (Math.sin(t * 1.5 - frac0 * 4.2) * 5.5 +
+                Math.cos(t * 0.8 + frac0 * 2.8) * 2.5) *
+              smoothWeight;
+
+            bgCtx.drawImage(
+              offscreenLandscape,
+              0,
+              sy,
+              srcW,
+              sh,
+              -padX + baseParallaxX + windShift,
+              dy,
+              width + padX * 2,
+              dh
+            );
           }
-
-          const parallaxShift = normPtrX * (22 * depthWeight);
-          const totalShiftX = windShift + parallaxShift + cursorShift;
-
-          ctx.drawImage(
-            offscreenLandscape,
-            0,
-            sy,
-            srcW,
-            sh,
-            -padX + totalShiftX,
-            dy - padY * 0.3,
-            width + padX * 2,
-            dh + padY * 0.3
-          );
         }
       } else {
-        // Immediate fallback gradient while photo buffer initializes
-        const skyGrad = ctx.createLinearGradient(0, 0, 0, height);
+        const skyGrad = bgCtx.createLinearGradient(0, 0, 0, height);
         skyGrad.addColorStop(0, '#449CE0');
         skyGrad.addColorStop(0.48, '#87CDF6');
         skyGrad.addColorStop(0.55, '#F4FAFF');
         skyGrad.addColorStop(0.65, '#86BE64');
         skyGrad.addColorStop(1, '#3D7028');
-        ctx.fillStyle = skyGrad;
-        ctx.fillRect(0, 0, width, height);
+        bgCtx.fillStyle = skyGrad;
+        bgCtx.fillRect(0, 0, width, height);
       }
 
-      // 2. Volumetric Drifting Cloud Veil & Sunlit Horizon Mist
-      ctx.save();
-      ctx.globalCompositeOperation = 'screen';
+      // 2. Volumetric Drifting Cloud Veil on Background Canvas
+      bgCtx.save();
+      bgCtx.globalCompositeOperation = 'screen';
       for (let c = 0; c < 4; c++) {
         const cloudX =
           ((width * (0.2 * c) + t * (9 + c * 3)) % (width + 500)) - 250;
         const cloudY = height * (0.28 + (c % 2) * 0.12);
-        const radGrad = ctx.createRadialGradient(
+        const radGrad = bgCtx.createRadialGradient(
           cloudX,
           cloudY,
           20,
@@ -374,22 +562,39 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         radGrad.addColorStop(0, 'rgba(255, 255, 255, 0.14)');
         radGrad.addColorStop(0.6, 'rgba(240, 250, 255, 0.05)');
         radGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        ctx.fillStyle = radGrad;
-        ctx.beginPath();
-        ctx.arc(cloudX, cloudY, 240, 0, Math.PI * 2);
-        ctx.fill();
+        bgCtx.fillStyle = radGrad;
+        bgCtx.beginPath();
+        bgCtx.arc(cloudX, cloudY, 240, 0, Math.PI * 2);
+        bgCtx.fill();
+      }
+      bgCtx.restore();
+
+      // 3. Background & Midground Grass Blades
+      for (let i = 0; i < blades.length; i++) {
+        if (blades[i].layer !== 2) {
+          drawGrassBlade(bgCtx, blades[i], t, ptr);
+        }
       }
 
-      // 3. Crepuscular Volumetric Sunbeams (God Rays) Streaming Across the Meadow
+      // 4. Foreground Grass Blades
+      for (let i = 0; i < blades.length; i++) {
+        if (blades[i].layer === 2) {
+          drawGrassBlade(fgCtx, blades[i], t, ptr);
+        }
+      }
+
+      // 5. Crepuscular Volumetric Sunbeams on Foreground Canvas
+      fgCtx.save();
+      fgCtx.globalCompositeOperation = 'screen';
       const rayOriginX = width * 0.18;
       const rayOriginY = -height * 0.15;
       for (let r = 0; r < 5; r++) {
         const baseAngle = 0.35 + r * 0.16 + Math.sin(t * 0.35 + r) * 0.03;
         const raySpread = 0.065;
         const rayLen = Math.max(width, height) * 1.45;
-        const rayAlpha = 0.045 + 0.025 * Math.sin(t * 0.7 + r * 1.7);
+        const rayAlpha = 0.038 + 0.02 * Math.sin(t * 0.7 + r * 1.7);
 
-        const rayGrad = ctx.createLinearGradient(
+        const rayGrad = fgCtx.createLinearGradient(
           rayOriginX,
           rayOriginY,
           rayOriginX + Math.cos(baseAngle) * rayLen,
@@ -399,131 +604,23 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         rayGrad.addColorStop(0.55, `rgba(255, 249, 210, ${rayAlpha})`);
         rayGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
-        ctx.fillStyle = rayGrad;
-        ctx.beginPath();
-        ctx.moveTo(rayOriginX, rayOriginY);
-        ctx.lineTo(
+        fgCtx.fillStyle = rayGrad;
+        fgCtx.beginPath();
+        fgCtx.moveTo(rayOriginX, rayOriginY);
+        fgCtx.lineTo(
           rayOriginX + Math.cos(baseAngle - raySpread) * rayLen,
           rayOriginY + Math.sin(baseAngle - raySpread) * rayLen
         );
-        ctx.lineTo(
+        fgCtx.lineTo(
           rayOriginX + Math.cos(baseAngle + raySpread) * rayLen,
           rayOriginY + Math.sin(baseAngle + raySpread) * rayLen
         );
-        ctx.closePath();
-        ctx.fill();
+        fgCtx.closePath();
+        fgCtx.fill();
       }
-      ctx.restore();
+      fgCtx.restore();
 
-      // 4. Foreground & Midground Swaying Sunlit Grass, Foxtails & Tiny Wildflowers
-      for (let i = 0; i < blades.length; i++) {
-        const b = blades[i];
-        const baseX = b.xRatio * width;
-        const baseY = height - b.yOffsetRatio * (height * 0.44);
-
-        const windWave = prefersReducedMotion
-          ? 2
-          : Math.sin(t * b.speed + b.xRatio * 5.8 + b.phase) * 10 +
-            Math.cos(t * 0.7 + b.xRatio * 3.2) * 4.5 +
-            3.5;
-
-        let cursorPush = 0;
-        if (ptr.active && !prefersReducedMotion) {
-          const dx = baseX - ptr.x;
-          const dy = baseY - b.height * 0.5 - ptr.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          const radius = 150;
-          if (dist < radius && dist > 1) {
-            const force = Math.pow(1 - dist / radius, 1.6);
-            cursorPush = (dx / dist) * force * 36;
-          }
-        }
-
-        const targetAngle = windWave + cursorPush;
-        const accel = (targetAngle - b.currentAngle) * b.stiffness;
-        b.velocity = (b.velocity + accel) * 0.82;
-        b.currentAngle += b.velocity;
-
-        const rad = (b.currentAngle * Math.PI) / 180;
-        const tipX = baseX + Math.sin(rad) * b.height;
-        const tipY = baseY - Math.cos(rad) * b.height;
-        const ctrlX = baseX + Math.sin(rad * 0.5) * (b.height * 0.55);
-        const ctrlY = baseY - b.height * 0.52;
-
-        // Main grass blade with sunlit gradient
-        const bladeGrad = ctx.createLinearGradient(baseX, baseY, tipX, tipY);
-        bladeGrad.addColorStop(0, b.color);
-        bladeGrad.addColorStop(1, b.highlightColor);
-
-        ctx.beginPath();
-        ctx.moveTo(baseX - b.width * 0.5, baseY);
-        ctx.quadraticCurveTo(ctrlX, ctrlY, tipX, tipY);
-        ctx.quadraticCurveTo(
-          ctrlX + b.width * 0.35,
-          ctrlY,
-          baseX + b.width * 0.5,
-          baseY
-        );
-        ctx.fillStyle = bladeGrad;
-        ctx.fill();
-
-        // Sunlit Foxtail Seed Plume
-        if (b.isFoxtail) {
-          ctx.save();
-          ctx.translate(tipX, tipY);
-          ctx.rotate(rad);
-          ctx.fillStyle = 'rgba(235, 248, 185, 0.78)';
-          ctx.beginPath();
-          ctx.ellipse(0, -6, 2.8, 9.5, 0, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-        }
-
-        // Tiny Wildflower Blossoms in Foreground Grass
-        if (b.blossomType) {
-          ctx.save();
-          ctx.translate(tipX, tipY);
-          if (b.blossomType === 'blue') {
-            ctx.fillStyle = '#80C4FF';
-            for (let p = 0; p < 5; p++) {
-              const a = (p * Math.PI * 2) / 5;
-              ctx.beginPath();
-              ctx.arc(
-                Math.cos(a) * 3.2,
-                Math.sin(a) * 3.2,
-                2.2,
-                0,
-                Math.PI * 2
-              );
-              ctx.fill();
-            }
-            ctx.fillStyle = '#FFF7A8';
-            ctx.beginPath();
-            ctx.arc(0, 0, 1.5, 0, Math.PI * 2);
-            ctx.fill();
-          } else if (b.blossomType === 'yellow') {
-            ctx.fillStyle = '#FFE45E';
-            ctx.beginPath();
-            ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
-            ctx.fill();
-          } else if (b.blossomType === 'pink') {
-            ctx.fillStyle = '#FAD0DF';
-            ctx.beginPath();
-            ctx.arc(0, 0, 3.8, 0, Math.PI * 2);
-            ctx.fill();
-          } else if (b.blossomType === 'lavender') {
-            ctx.fillStyle = '#E2BAFA';
-            ctx.beginPath();
-            ctx.arc(0, -2, 3.0, 0, Math.PI * 2);
-            ctx.arc(-2, 2, 2.5, 0, Math.PI * 2);
-            ctx.arc(2, 2, 2.5, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          ctx.restore();
-        }
-      }
-
-      // 5. Render Fluttering Meadow Butterflies
+      // 6. Fluttering Meadow Butterflies
       for (let i = 0; i < butterflies.length; i++) {
         const bf = butterflies[i];
         if (!prefersReducedMotion) {
@@ -531,14 +628,14 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
           bf.x += bf.vx + Math.sin(t * 1.2 + i) * 0.35;
           bf.y += bf.vy + Math.cos(t * 1.7 + i * 2) * 0.45;
 
-          // Gently steer away from cursor
           if (ptr.active) {
-            const dx = bf.x - ptr.x;
-            const dy = bf.y - ptr.y;
-            const d = Math.sqrt(dx * dx + dy * dy);
-            if (d < 130 && d > 1) {
-              bf.x += (dx / d) * 2.2;
-              bf.y += (dy / d) * 2.2;
+            const dx = bf.x - ptr.smoothX;
+            const dy = bf.y - ptr.smoothY;
+            const dSq = dx * dx + dy * dy;
+            if (dSq < 130 * 130) {
+              const falloff = 1 - dSq / (130 * 130);
+              bf.x += (dx / 130) * falloff * 2.5;
+              bf.y += (dy / 130) * falloff * 2.5;
             }
           }
 
@@ -549,30 +646,29 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         }
 
         const flap = Math.abs(Math.sin(bf.wingPhase));
-        ctx.save();
-        ctx.translate(bf.x, bf.y);
-        ctx.rotate(bf.vx > 0 ? 0.2 : -0.2);
-        ctx.scale(bf.scale, bf.scale);
+        fgCtx.save();
+        fgCtx.translate(bf.x, bf.y);
+        fgCtx.rotate(bf.vx > 0 ? 0.2 : -0.2);
+        fgCtx.scale(bf.scale, bf.scale);
 
-        ctx.shadowColor = 'rgba(255, 250, 210, 0.7)';
-        ctx.shadowBlur = 8;
+        fgCtx.shadowColor = 'rgba(255, 250, 210, 0.7)';
+        fgCtx.shadowBlur = 8;
 
-        // Upper & lower wings modulated by flap
-        ctx.fillStyle = bf.color;
-        ctx.beginPath();
-        ctx.ellipse(-4, -3, 7 * flap + 1.5, 5, -0.35, 0, Math.PI * 2);
-        ctx.ellipse(4, -3, 7 * flap + 1.5, 5, 0.35, 0, Math.PI * 2);
-        ctx.fill();
+        fgCtx.fillStyle = bf.color;
+        fgCtx.beginPath();
+        fgCtx.ellipse(-4, -3, 7 * flap + 1.5, 5, -0.35, 0, Math.PI * 2);
+        fgCtx.ellipse(4, -3, 7 * flap + 1.5, 5, 0.35, 0, Math.PI * 2);
+        fgCtx.fill();
 
-        ctx.fillStyle = bf.innerColor;
-        ctx.beginPath();
-        ctx.ellipse(-3, 2, 4.5 * flap + 1, 3.5, -0.2, 0, Math.PI * 2);
-        ctx.ellipse(3, 2, 4.5 * flap + 1, 3.5, 0.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        fgCtx.fillStyle = bf.innerColor;
+        fgCtx.beginPath();
+        fgCtx.ellipse(-3, 2, 4.5 * flap + 1, 3.5, -0.2, 0, Math.PI * 2);
+        fgCtx.ellipse(3, 2, 4.5 * flap + 1, 3.5, 0.2, 0, Math.PI * 2);
+        fgCtx.fill();
+        fgCtx.restore();
       }
 
-      // 6. Render Atmospheric Particles (Lens Bokeh, Dandelion Pappus, Pollen, Petals)
+      // 7. Atmospheric Particles
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i];
         if (!prefersReducedMotion) {
@@ -586,90 +682,123 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
           if (p.y > height + 40) p.y = -30;
         }
 
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rotation);
+        fgCtx.save();
+        fgCtx.translate(p.x, p.y);
+        fgCtx.rotate(p.rotation);
         const pulse = 0.7 + 0.3 * Math.sin(t * 1.4 + i);
-        ctx.globalAlpha = p.alpha * pulse;
+        fgCtx.globalAlpha = p.alpha * pulse;
 
         if (p.kind === 'bokeh') {
-          const bokehGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, p.size);
+          const bokehGrad = fgCtx.createRadialGradient(0, 0, 1, 0, 0, p.size);
           bokehGrad.addColorStop(0, 'rgba(255, 253, 232, 0.85)');
           bokehGrad.addColorStop(0.7, 'rgba(255, 245, 200, 0.35)');
           bokehGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-          ctx.fillStyle = bokehGrad;
-          ctx.beginPath();
-          ctx.arc(0, 0, p.size, 0, Math.PI * 2);
-          ctx.fill();
+          fgCtx.fillStyle = bokehGrad;
+          fgCtx.beginPath();
+          fgCtx.arc(0, 0, p.size, 0, Math.PI * 2);
+          fgCtx.fill();
         } else if (p.kind === 'dandelion') {
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-          ctx.lineWidth = 0.8;
+          fgCtx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+          fgCtx.lineWidth = 0.8;
           for (let ray = 0; ray < 7; ray++) {
             const a = -Math.PI * 0.85 + (ray / 6) * Math.PI * 0.7;
-            ctx.beginPath();
-            ctx.moveTo(0, 3);
-            ctx.lineTo(Math.cos(a) * p.size, Math.sin(a) * p.size);
-            ctx.stroke();
+            fgCtx.beginPath();
+            fgCtx.moveTo(0, 3);
+            fgCtx.lineTo(Math.cos(a) * p.size, Math.sin(a) * p.size);
+            fgCtx.stroke();
           }
-          ctx.fillStyle = '#FFF6D6';
-          ctx.beginPath();
-          ctx.arc(0, 3.5, 1.1, 0, Math.PI * 2);
-          ctx.fill();
+          fgCtx.fillStyle = '#FFF6D6';
+          fgCtx.beginPath();
+          fgCtx.arc(0, 3.5, 1.1, 0, Math.PI * 2);
+          fgCtx.fill();
         } else if (p.kind === 'petal') {
-          ctx.fillStyle = p.color;
-          ctx.beginPath();
-          ctx.ellipse(0, 0, p.size * 1.8, p.size, 0, 0, Math.PI * 2);
-          ctx.fill();
+          fgCtx.fillStyle = p.color;
+          fgCtx.beginPath();
+          fgCtx.ellipse(0, 0, p.size * 1.8, p.size, 0, 0, Math.PI * 2);
+          fgCtx.fill();
         } else {
-          ctx.fillStyle = '#FFFDF0';
-          ctx.shadowColor = '#FFF59E';
-          ctx.shadowBlur = 8;
-          ctx.beginPath();
-          ctx.arc(0, 0, p.size * 0.75, 0, Math.PI * 2);
-          ctx.fill();
+          fgCtx.fillStyle = '#FFFDF0';
+          fgCtx.shadowColor = '#FFF59E';
+          fgCtx.shadowBlur = 8;
+          fgCtx.beginPath();
+          fgCtx.arc(0, 0, p.size * 0.75, 0, Math.PI * 2);
+          fgCtx.fill();
         }
-        ctx.restore();
+        fgCtx.restore();
       }
 
-      // 7. Update Spring Physics for Interactive Story Flowers (~30fps sync)
-      if (timeMs - lastSpringSync > 32) {
-        lastSpringSync = timeMs;
-        const nextBends: Record<string, number> = {};
-        const meadowHeightPx = height * 0.48;
+      // 8. 60fps Direct GPU Transform Solver for Story Flowers (Zero React State Re-renders!)
+      const meadowHeightPx = height * 0.49;
+      const activeHoverId = hoveredStoryIdRef.current;
+      const activeHighlightId = highlightedStoryIdRef.current;
 
-        stories.forEach((s) => {
-          const st = springStateRef.current[s.storyId];
-          if (!st) return;
+      for (let i = 0; i < stories.length; i++) {
+        const s = stories[i];
+        const st = springStateRef.current[s.storyId];
+        if (!st) continue;
 
-          const flowerX = (s.positionX / 100) * width;
-          const flowerY = height - (s.positionY / 100) * meadowHeightPx - 65;
+        const isHovered = activeHoverId === s.storyId;
+        const isHighlighted = activeHighlightId === s.storyId;
 
-          const wind = prefersReducedMotion
-            ? 0
-            : Math.sin(t * st.speed + (s.positionX / 100) * 5.2 + st.phase) * 7.5 +
-              Math.cos(t * 0.7 + st.phase) * 3.2 +
-              2.2;
+        const flowerX = (s.positionX / 100) * width;
+        const flowerY = height - (s.positionY * 0.76 * meadowHeightPx) / 100 - 55;
 
-          let push = 0;
-          if (ptr.active && !prefersReducedMotion) {
-            const dx = flowerX - ptr.x;
-            const dy = flowerY - ptr.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const influenceRadius = 170;
-            if (dist < influenceRadius && dist > 1) {
-              const factor = Math.pow(1 - dist / influenceRadius, 1.5);
-              push = (dx / dist) * factor * 25;
-            }
+        const wind = prefersReducedMotion
+          ? 0
+          : Math.sin(t * st.speed + (s.positionX / 100) * 5.2 + st.phase) * 5.2 +
+            Math.cos(t * 0.7 + st.phase) * 2.4 +
+            1.5;
+
+        // Smooth bell-curve derivative repulsion (zero sign-flip jump at flowerX == smoothX!)
+        let push = 0;
+        if (ptr.active && !prefersReducedMotion) {
+          const dx = flowerX - ptr.smoothX;
+          const dy = flowerY - ptr.smoothY;
+          const influenceRadius = 175;
+          const distSq = dx * dx + dy * dy;
+          const rSq = influenceRadius * influenceRadius;
+          if (distSq < rSq) {
+            const falloff = Math.pow(1 - distSq / rSq, 2);
+            // When actively hovered, gently calm the repulsion so the flower doesn't flee the cursor
+            const hoverDamping = isHovered ? 0.22 : 1.0;
+            push = (dx / influenceRadius) * falloff * 38 * hoverDamping;
           }
+        }
 
-          const target = wind + push;
-          const accel = (target - st.angle) * 0.14;
-          st.velocity = (st.velocity + accel) * 0.78;
-          st.angle += st.velocity;
-          nextBends[s.storyId] = Number(st.angle.toFixed(2));
-        });
+        const targetAngle = wind + push;
+        const angleAccel = (targetAngle - st.angle) * 0.11;
+        st.velocity = (st.velocity + angleAccel) * 0.82;
+        st.angle += st.velocity;
 
-        setFlowerBends(nextBends);
+        const targetScale =
+          st.naturalScale * (isHovered ? 1.14 : isHighlighted ? 1.08 : 1.0);
+        const scaleAccel = (targetScale - st.scale) * 0.14;
+        st.scaleVelocity = (st.scaleVelocity + scaleAccel) * 0.76;
+        st.scale += st.scaleVelocity;
+
+        const visualEl = flowerVisualRefs.current[s.storyId];
+        if (visualEl) {
+          visualEl.style.transform = `scale(${st.scale.toFixed(
+            3
+          )}) rotate(${st.angle.toFixed(2)}deg)`;
+        }
+
+        // Smoothly track the floating popup card to the hovered/highlighted flower tip
+        if (
+          popupCardRef.current &&
+          (s.storyId === activeHoverId ||
+            (!activeHoverId && s.storyId === activeHighlightId))
+        ) {
+          const bendOffsetPx = st.angle * 1.15;
+          const clampedX = Math.max(12, Math.min(88, s.positionX));
+          const flowerTopOffsetPx = Math.round(138 * st.scale);
+          popupCardRef.current.style.left = `calc(${clampedX}% + ${bendOffsetPx.toFixed(
+            1
+          )}px)`;
+          popupCardRef.current.style.bottom = `calc(${
+            s.positionY * 0.76
+          }% + ${flowerTopOffsetPx}px)`;
+        }
       }
 
       animationFrameId = requestAnimationFrame(render);
@@ -683,18 +812,15 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
   }, [stories]);
 
   const handlePointerMove = (clientX: number, clientY: number) => {
-    pointerRef.current = { x: clientX, y: clientY, active: true };
-    const nx = (clientX / window.innerWidth - 0.5) * 2;
-    const ny = (clientY / window.innerHeight - 0.5) * 2;
-    setCursorParallax({ x: nx * 12, y: ny * 7 });
+    pointerRef.current.x = clientX;
+    pointerRef.current.y = clientY;
+    pointerRef.current.active = true;
   };
 
   const handlePointerLeave = () => {
     pointerRef.current.active = false;
-    setCursorParallax({ x: 0, y: 0 });
   };
 
-  // Clicking anywhere in the flower meadow also discovers a story if a visitor taps between stems
   const handleMeadowBackgroundClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.clientY > window.innerHeight * 0.52 && stories.length > 0) {
       soundscape.playBloomChord();
@@ -706,6 +832,12 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
   const sortedStories = useMemo(() => {
     return [...stories].sort((a, b) => b.positionY - a.positionY);
   }, [stories]);
+
+  const activePopupStory = useMemo(() => {
+    const targetId = hoveredStoryId || highlightedStoryId;
+    if (!targetId) return null;
+    return stories.find((s) => s.storyId === targetId) || null;
+  }, [hoveredStoryId, highlightedStoryId, stories]);
 
   return (
     <div
@@ -721,27 +853,30 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
       onTouchEnd={handlePointerLeave}
       className="relative w-full h-screen overflow-hidden select-none bg-[#55ACE3]"
     >
-      {/* Photorealistic Multi-Plane & High-VFX Canvas Engine */}
+      {/* LAYER 1: Background Photographic Meadow & Midground Grass Canvas */}
       <canvas
-        ref={canvasRef}
+        ref={bgCanvasRef}
         className="pointer-events-none absolute inset-0 w-full h-full"
         style={{ zIndex: 10 }}
       />
 
-      {/* Interactive Story Flowers Anchored in the 3D Meadow */}
+      {/* LAYER 2: Interactive Story Flowers Nestled Inside the Meadow Depth Planes */}
       <div
-        className="absolute inset-x-0 bottom-0 h-[49%] pointer-events-none"
-        style={{
-          zIndex: 30,
-          transform: `translate3d(${cursorParallax.x * 0.9}px, ${cursorParallax.y * 0.35}px, 0)`,
-        }}
+        ref={flowersLayerRef}
+        className="absolute inset-x-0 bottom-0 h-[49%] pointer-events-none will-change-transform"
+        style={{ zIndex: 25 }}
       >
         {sortedStories.map((story) => {
           const isHovered = hoveredStoryId === story.storyId;
           const isHighlighted = highlightedStoryId === story.storyId;
-          const bend = flowerBends[story.storyId] || 0;
-          const depthZ =
-            Math.round(120 - story.positionY) + (isHovered ? 100 : 0);
+          const depthZ = isHovered
+            ? 450
+            : isHighlighted
+            ? 400
+            : Math.round(120 - story.positionY);
+
+          const isFarHorizon = story.positionY > 56;
+          const initialScale = Number((story.scale * 0.76).toFixed(3));
 
           return (
             <div
@@ -750,61 +885,58 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
               className="pointer-events-auto absolute origin-bottom -translate-x-1/2"
               style={{
                 left: `${story.positionX}%`,
-                bottom: `${story.positionY * 0.78}%`,
+                bottom: `${story.positionY * 0.76}%`,
                 zIndex: depthZ,
+                filter: isFarHorizon
+                  ? 'brightness(1.03) saturate(0.92)'
+                  : 'brightness(1.01) saturate(0.96)',
               }}
             >
               {/* Newly Planted Bioluminescent Aura */}
               {(isHighlighted || story.isNewlyPlanted) && (
-                <div className="pointer-events-none absolute -inset-5 rounded-full bg-amber-200/55 blur-xl animate-pulse-aura" />
+                <div className="pointer-events-none absolute -inset-4 rounded-full bg-amber-200/55 blur-xl animate-pulse-aura" />
               )}
 
-              {/* Hover Story Whisper Pill */}
-              <div
-                className={`pointer-events-none absolute left-1/2 -top-11 -translate-x-1/2 whitespace-nowrap transition-all duration-200 ${
-                  isHovered || isHighlighted
-                    ? 'opacity-100 -translate-y-1 scale-100'
-                    : 'opacity-0 translate-y-2 scale-95'
-                }`}
-              >
-                <div className="px-3 py-1 rounded-full bg-white/92 backdrop-blur-md shadow-md border border-white/85 text-center">
-                  <p className="text-[11px] font-semibold text-slate-800 leading-tight">
-                    {isHighlighted
-                      ? 'Your newly planted flower'
-                      : 'Read this story'}
-                  </p>
-                  <p className="text-[10px] text-slate-500 leading-tight">
-                    {story.anonymousId} · {story.warmthCount} warmth
-                  </p>
-                </div>
-              </div>
-
+              {/* Stationary Hitbox Button prevents hover-boundary oscillation while flower sways */}
               <button
                 type="button"
                 onMouseEnter={() => {
                   setHoveredStoryId(story.storyId);
                   soundscape.playHoverChime();
                 }}
-                onMouseLeave={() => setHoveredStoryId(null)}
+                onMouseLeave={() =>
+                  setHoveredStoryId((prev) =>
+                    prev === story.storyId ? null : prev
+                  )
+                }
                 onFocus={() => setHoveredStoryId(story.storyId)}
-                onBlur={() => setHoveredStoryId(null)}
+                onBlur={() =>
+                  setHoveredStoryId((prev) =>
+                    prev === story.storyId ? null : prev
+                  )
+                }
                 onClick={() => {
                   soundscape.playBloomChord();
                   onSelectStory(story);
                 }}
                 aria-label={`Read story by ${story.anonymousId}`}
-                className="group relative block cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white/90 rounded-full"
-                style={{
-                  transform: `scale(${story.scale})`,
-                  transformOrigin: 'bottom center',
-                }}
+                className="group relative flex items-end justify-center w-[68px] sm:w-[76px] h-[136px] sm:h-[148px] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white/90 rounded-full"
               >
-                <div className="w-[82px] sm:w-[92px] h-[160px] sm:h-[176px]">
+                <div
+                  ref={(el) => {
+                    flowerVisualRefs.current[story.storyId] = el;
+                  }}
+                  className="w-[74px] sm:w-[82px] h-[142px] sm:h-[156px] pointer-events-none will-change-transform"
+                  style={{
+                    transform: `scale(${initialScale}) rotate(0deg)`,
+                    transformOrigin: '50% 92%',
+                  }}
+                >
                   <MeadowFlowerSvg
                     variant={story.flowerVariant}
                     isHovered={isHovered || isHighlighted}
-                    bendAngle={bend}
-                    stemHeight={132}
+                    bendAngle={0}
+                    stemHeight={122}
                     uniqueId={story.storyId}
                   />
                 </div>
@@ -813,6 +945,74 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
           );
         })}
       </div>
+
+      {/* LAYER 3: Foreground Grass Blades, Sunbeams, Bokeh & Butterflies Overlapping Flower Bases */}
+      <canvas
+        ref={fgCanvasRef}
+        className="pointer-events-none absolute inset-0 w-full h-full"
+        style={{ zIndex: 35 }}
+      />
+
+      {/* LAYER 4: Top-Level Unobstructed Floating "Read this story" Whisper Card */}
+      {activePopupStory && (
+        <div
+          ref={popupLayerRef}
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[49%] will-change-transform"
+          style={{ zIndex: 90 }}
+        >
+          {(() => {
+            const seedInfo =
+              SEED_OPTIONS.find((s) => s.id === activePopupStory.seedType) ||
+              SEED_OPTIONS[0];
+            const naturalScale = activePopupStory.scale * 0.76;
+            const flowerTopOffsetPx = Math.round(138 * naturalScale);
+            const clampedX = Math.max(
+              12,
+              Math.min(88, activePopupStory.positionX)
+            );
+            const isHighlighted =
+              highlightedStoryId === activePopupStory.storyId &&
+              hoveredStoryId !== activePopupStory.storyId;
+
+            return (
+              <div
+                ref={popupCardRef}
+                style={{
+                  left: `${clampedX}%`,
+                  bottom: `calc(${activePopupStory.positionY * 0.76}% + ${flowerTopOffsetPx}px)`,
+                }}
+                className="absolute -translate-x-1/2 will-change-[left,bottom]"
+              >
+                <div className="relative px-3.5 py-2 rounded-2xl bg-white/95 backdrop-blur-xl shadow-[0_10px_28px_rgba(15,23,42,0.18)] border border-white min-w-[168px] max-w-[220px] text-center">
+                  <div className="inline-flex items-center justify-center gap-1 text-[11px] font-semibold text-slate-900">
+                    <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />
+                    <span>
+                      {isHighlighted
+                        ? 'Your newly planted flower'
+                        : 'Read this story'}
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] font-medium text-slate-600 mt-0.5 truncate">
+                    {activePopupStory.anonymousId}
+                  </p>
+
+                  <div className="mt-1 flex items-center justify-center gap-1.5 text-[10px] text-slate-500">
+                    <span>{seedInfo.name}</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="inline-flex items-center gap-0.5 text-rose-600 font-medium">
+                      <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500" />
+                      {activePopupStory.warmthCount}
+                    </span>
+                  </div>
+
+                  <div className="w-2.5 h-2.5 bg-white/95 border-r border-b border-white rotate-45 mx-auto -mb-3 mt-1 shadow-2xs" />
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Soft Optical Depth-of-Field Foreground Blur & Sunlit Vignette */}
       <div

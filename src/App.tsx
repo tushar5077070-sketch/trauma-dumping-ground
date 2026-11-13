@@ -4,12 +4,11 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Volume2, VolumeX, Flower2 } from 'lucide-react';
+import { Volume2, VolumeX, Flower2, Sparkles } from 'lucide-react';
 import { INITIAL_GARDEN_STORIES, SeedType, Story } from './types/garden';
 import { subscribeToApprovedStories } from './services/gardenService';
 import { soundscape } from './utils/soundscape';
 import { LivingGardenCanvas } from './components/LivingGardenCanvas';
-import { SeedSelectorDropdown } from './components/SeedSelectorDropdown';
 import { WriteStoryModal } from './components/WriteStoryModal';
 import { StoryReaderModal } from './components/StoryReaderModal';
 import { InfoModals } from './components/InfoModals';
@@ -136,15 +135,11 @@ export default function App() {
           >
             How It Works
           </button>
-        </nav>
-
-        {/* Zone 3: Sound Toggle */}
-        <div className="flex items-center shrink-0">
           <button
             type="button"
             onClick={handleToggleSound}
             aria-label={isSoundEnabled ? 'Mute meadow soundscape' : 'Enable meadow soundscape'}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white/22 hover:bg-white/32 backdrop-blur-md border border-white/35 text-xs font-medium text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+            className="inline-flex items-center gap-1.5 hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0 cursor-pointer drop-shadow-xs"
           >
             {isSoundEnabled ? (
               <>
@@ -157,6 +152,18 @@ export default function App() {
                 <span className="hidden sm:inline">Sound Off</span>
               </>
             )}
+          </button>
+        </nav>
+
+        {/* Zone 3: Direct Primary CTA — Plant a Seed */}
+        <div className="flex items-center shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsWriteModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-900/88 hover:bg-slate-900 backdrop-blur-md border border-white/25 text-xs font-medium text-white shadow-sm transition-all whitespace-nowrap shrink-0 cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+            <span>Plant a Seed 🌱</span>
           </button>
         </div>
       </header>
@@ -184,7 +191,7 @@ export default function App() {
             Some things are too heavy to carry alone. Leave your story here, and let it grow into something beautiful.
           </p>
 
-          <div className="pt-1 pointer-events-auto">
+          <div className="pt-1.5 pointer-events-auto flex flex-wrap items-center justify-center gap-2.5">
             <button
               type="button"
               onClick={() => {
@@ -195,18 +202,20 @@ export default function App() {
             >
               <span>Tap on a flower to discover someone's story.</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setIsWriteModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/90 hover:bg-white text-slate-900 text-xs sm:text-sm font-medium shadow-sm transition-all cursor-pointer whitespace-nowrap"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+              <span>Plant a Seed 🌱</span>
+            </button>
           </div>
         </div>
       </main>
 
-      {/* 4. Right-Side Floating Seed Dropdown */}
-      <SeedSelectorDropdown
-        selectedSeed={selectedSeed}
-        onSelectSeed={setSelectedSeed}
-        onOpenWriteModal={() => setIsWriteModalOpen(true)}
-      />
-
-      {/* 5. Story Reading Sanctuary Modal */}
+      {/* 4. Story Reading Sanctuary Modal */}
       <StoryReaderModal
         story={activeStory}
         onClose={() => setActiveStory(null)}
@@ -214,7 +223,7 @@ export default function App() {
         onLocalStoryWarmthIncrement={handleLocalStoryWarmthIncrement}
       />
 
-      {/* 6. Write Your Story & Planting Animation Modal */}
+      {/* 5. Write Your Story & Planting Animation Modal */}
       <WriteStoryModal
         isOpen={isWriteModalOpen}
         selectedSeed={selectedSeed}
@@ -224,7 +233,7 @@ export default function App() {
         onStoryPlanted={handleStoryPlanted}
       />
 
-      {/* 7. About & How It Works Modals */}
+      {/* 6. About & How It Works Modals */}
       <InfoModals
         activeModal={activeInfoModal}
         onClose={() => setActiveInfoModal(null)}

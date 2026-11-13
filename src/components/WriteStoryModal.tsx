@@ -154,10 +154,10 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
           </div>
 
           <form onSubmit={handlePlantSubmit} className="mt-6 space-y-5">
-            {/* Seed Selector Strip */}
+            {/* Choose Your Seed Directly in the Plant Modal */}
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-2">
-                Selected Seed
+              <label className="block text-xs font-semibold text-slate-800 mb-2">
+                Choose your seed 🌱
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 {SEED_OPTIONS.map((seed) => {
@@ -167,19 +167,19 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
                       key={seed.id}
                       type="button"
                       onClick={() => onSelectSeed(seed.id)}
-                      className={`flex items-center gap-2.5 p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      className={`flex items-start gap-2.5 p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                         isActive
-                          ? 'bg-sky-50/90 border-sky-300 shadow-xs'
-                          : 'bg-slate-50/70 border-slate-200/80 hover:bg-white'
+                          ? 'bg-sky-50/95 border-sky-300 shadow-xs ring-1 ring-sky-200'
+                          : 'bg-slate-50/75 border-slate-200/80 hover:bg-white'
                       }`}
                     >
-                      <SeedIconIllustration seedType={seed.id} size={36} />
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-slate-900 truncate">
-                          {seed.name}
+                      <SeedIconIllustration seedType={seed.id} size={40} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-slate-900">
+                          {seed.numberLabel} — {seed.name}
                         </p>
-                        <p className="text-[11px] text-slate-500 truncate">
-                          {seed.tagline}
+                        <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                          {seed.description}
                         </p>
                       </div>
                     </button>

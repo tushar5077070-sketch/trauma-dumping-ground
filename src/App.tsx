@@ -97,84 +97,99 @@ export default function App() {
         highlightedStoryId={highlightedStoryId}
       />
 
-      {/* 2. Top Navigation & Sky Sanctuary Overlay — Uncompressed & Fully Visible Across All Devices */}
-      <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex flex-col">
-        <header className="pointer-events-auto w-full flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3.5 sm:px-6 md:px-8 py-2.5 sm:py-4 bg-gradient-to-b from-slate-950/28 via-slate-900/12 to-transparent">
-          {/* Zone 1: Full Brand Title (Never truncated on any device) */}
-          <a
-            href="#top"
-            onClick={(e) => {
-              e.preventDefault();
-              setActiveStory(null);
-              setIsWriteModalOpen(false);
-              setActiveInfoModal(null);
-            }}
-            className="inline-flex items-center gap-2 font-editorial text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-white drop-shadow-sm shrink-0"
-          >
-            <Flower2 className="w-4 h-4 sm:w-5 sm:h-5 text-pink-100 shrink-0" />
-            <span>Trauma Dumping Ground</span>
-          </a>
+      {/* 2. Top Navigation & Sky Sanctuary Overlay — Responsive Across Mobile, Tablet (Portrait/Landscape) & Laptop */}
+      <div className="pointer-events-none fixed inset-x-0 top-0 h-[52dvh] min-h-[240px] max-h-[520px] z-40 flex flex-col justify-between pb-2 sm:pb-4">
+        <header className="pointer-events-auto w-full px-3.5 sm:px-5 md:px-7 lg:px-10 py-2.5 sm:py-3.5 lg:py-4 bg-gradient-to-b from-slate-950/30 via-slate-900/12 to-transparent">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 md:gap-4">
+            {/* Top row on mobile / Left side on Tablet & Laptop: Brand + Mobile CTA */}
+            <div className="flex items-center justify-between gap-2 shrink-0">
+              <a
+                href="#top"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setActiveStory(null);
+                  setIsWriteModalOpen(false);
+                  setActiveInfoModal(null);
+                }}
+                className="inline-flex items-center gap-1.5 sm:gap-2 font-editorial text-lg sm:text-lg md:text-xl lg:text-2xl font-semibold tracking-tight text-white drop-shadow-sm whitespace-nowrap shrink-0"
+              >
+                <Flower2 className="w-4 h-4 sm:w-4.5 sm:h-4.5 lg:w-5 lg:h-5 text-pink-100 shrink-0" />
+                <span>Trauma Dumping Ground</span>
+              </a>
 
-          {/* Zone 2 & 3: All Navigation Links, Sound Toggle & Plant CTA Visible in Full */}
-          <div className="flex flex-wrap items-center justify-between sm:justify-end gap-x-3 sm:gap-x-5 gap-y-1.5 w-full sm:w-auto">
-            <nav
-              aria-label="Primary navigation"
-              className="flex items-center gap-3 sm:gap-5 text-xs sm:text-sm font-medium text-white/95"
-            >
+              {/* Mobile-only Plant CTA on Row 1 right */}
               <button
                 type="button"
-                onClick={() => setActiveInfoModal('about')}
-                className="py-1 hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
+                onClick={() => setIsWriteModalOpen(true)}
+                className="sm:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md border border-white/25 text-xs font-medium text-white shadow-sm transition-all whitespace-nowrap cursor-pointer shrink-0"
               >
-                About
+                <Sparkles className="w-3 h-3 text-amber-200 shrink-0" />
+                <span>Plant a Seed 🌱</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setActiveInfoModal('how-it-works')}
-                className="py-1 hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
-              >
-                How It Works
-              </button>
-              <button
-                type="button"
-                onClick={handleToggleSound}
-                aria-label={
-                  isSoundEnabled
-                    ? 'Mute meadow soundscape'
-                    : 'Enable meadow soundscape'
-                }
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 hover:bg-white/30 border border-white/35 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
-              >
-                {isSoundEnabled ? (
-                  <>
-                    <Volume2 className="w-3.5 h-3.5 shrink-0" />
-                    <span className="text-xs">Sound On</span>
-                  </>
-                ) : (
-                  <>
-                    <VolumeX className="w-3.5 h-3.5 opacity-90 shrink-0" />
-                    <span className="text-xs">Sound Off</span>
-                  </>
-                )}
-              </button>
-            </nav>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setIsWriteModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md border border-white/25 text-xs sm:text-sm font-medium text-white shadow-sm transition-all whitespace-nowrap cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-200 shrink-0" />
-              <span>Plant a Seed 🌱</span>
-            </button>
+            {/* Row 2 on mobile / Right side on Tablet & Laptop: Navigation, Sound & Tablet/Desktop CTA */}
+            <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 md:gap-4 lg:gap-6 shrink-0">
+              <nav
+                aria-label="Primary navigation"
+                className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-3 sm:gap-3 md:gap-4 lg:gap-6 text-xs md:text-sm font-medium text-white/95"
+              >
+                <button
+                  type="button"
+                  onClick={() => setActiveInfoModal('about')}
+                  className="py-1 hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
+                >
+                  About
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveInfoModal('how-it-works')}
+                  className="py-1 hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
+                >
+                  How It Works
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToggleSound}
+                  aria-label={
+                    isSoundEnabled
+                      ? 'Mute meadow soundscape'
+                      : 'Enable meadow soundscape'
+                  }
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 hover:bg-white/30 border border-white/35 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
+                >
+                  {isSoundEnabled ? (
+                    <>
+                      <Volume2 className="w-3.5 h-3.5 shrink-0" />
+                      <span className="text-xs">Sound On</span>
+                    </>
+                  ) : (
+                    <>
+                      <VolumeX className="w-3.5 h-3.5 opacity-90 shrink-0" />
+                      <span className="text-xs">Sound Off</span>
+                    </>
+                  )}
+                </button>
+              </nav>
+
+              {/* Tablet & Desktop Plant CTA */}
+              <button
+                type="button"
+                onClick={() => setIsWriteModalOpen(true)}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 md:px-4 py-1.5 md:py-2 rounded-full bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md border border-white/25 text-xs md:text-sm font-medium text-white shadow-sm transition-all whitespace-nowrap cursor-pointer shrink-0"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-200 shrink-0" />
+                <span>Plant a Seed 🌱</span>
+              </button>
+            </div>
           </div>
         </header>
 
-        {/* 3. Center of the Sky Typography Sanctuary — Adapts Cleanly to Portrait, Landscape & Desktop */}
-        <main className="pointer-events-none w-full flex flex-col items-center text-center px-4 pt-1 sm:pt-4 md:pt-7">
-          <div className="max-w-xl mx-auto space-y-1.5 sm:space-y-3">
+        {/* 3. Center of the Sky Typography Sanctuary — Balanced on Mobile, Tablet & Laptop */}
+        <main className="pointer-events-none w-full my-auto flex flex-col items-center justify-center text-center px-4 sm:px-8">
+          <div className="max-w-lg sm:max-w-xl md:max-w-2xl mx-auto space-y-1.5 sm:space-y-2.5 lg:space-y-3">
             <h1
-              className="font-editorial text-3xl sm:text-5xl md:text-6xl font-semibold text-white tracking-tight leading-[1.08]"
+              className="font-editorial text-2xl sm:text-4xl md:text-[44px] lg:text-6xl font-semibold text-white tracking-tight leading-[1.08]"
               style={{
                 textWrap: 'balance',
                 textShadow: '0 4px 24px rgba(32, 92, 138, 0.35)',
@@ -184,7 +199,7 @@ export default function App() {
             </h1>
 
             <p
-              className="text-xs sm:text-sm md:text-base text-white/95 max-w-md mx-auto leading-snug sm:leading-relaxed font-normal"
+              className="text-xs sm:text-sm md:text-base text-white/95 max-w-md md:max-w-lg mx-auto leading-snug sm:leading-relaxed font-normal"
               style={{
                 textWrap: 'balance',
                 textShadow: '0 2px 12px rgba(28, 84, 128, 0.32)',
@@ -200,7 +215,7 @@ export default function App() {
                   soundscape.playBloomChord();
                   handleReadRandomStory();
                 }}
-                className="inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white/25 hover:bg-white/38 backdrop-blur-md border border-white/45 text-xs sm:text-sm font-medium text-white shadow-xs transition-all cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 md:px-5 py-1.5 sm:py-2 rounded-full bg-white/25 hover:bg-white/38 backdrop-blur-md border border-white/45 text-xs sm:text-sm font-medium text-white shadow-xs transition-all cursor-pointer"
               >
                 <Compass className="w-3.5 h-3.5 text-white shrink-0" />
                 <span>Tap on a flower to discover someone's story.</span>
@@ -209,7 +224,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setIsWriteModalOpen(true)}
-                className="inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white/92 hover:bg-white text-slate-900 text-xs sm:text-sm font-medium shadow-sm transition-all cursor-pointer"
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 md:px-5 py-1.5 sm:py-2 rounded-full bg-white/92 hover:bg-white text-slate-900 text-xs sm:text-sm font-medium shadow-sm transition-all cursor-pointer"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
                 <span>Plant a Seed 🌱</span>

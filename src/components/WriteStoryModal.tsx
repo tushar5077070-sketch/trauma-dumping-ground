@@ -170,7 +170,7 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
               <label className="block text-xs font-semibold text-slate-800 mb-2">
                 Choose your seed 🌱
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 {SEED_OPTIONS.map((seed) => {
                   const isActive = seed.id === selectedSeed;
                   return (
@@ -178,20 +178,27 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
                       key={seed.id}
                       type="button"
                       onClick={() => onSelectSeed(seed.id)}
-                      className={`flex items-center sm:items-start gap-2.5 p-2.5 sm:p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                      className={`flex flex-row sm:flex-col lg:flex-row items-center sm:items-start gap-2.5 p-3 rounded-2xl border text-left transition-all cursor-pointer ${
                         isActive
                           ? 'bg-sky-50/95 border-sky-300 shadow-xs ring-1 ring-sky-200'
                           : 'bg-slate-50/75 border-slate-200/80 hover:bg-white'
                       }`}
                     >
-                      <SeedIconIllustration seedType={seed.id} size={34} />
-                      <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between w-auto sm:w-full lg:w-auto shrink-0">
+                        <SeedIconIllustration seedType={seed.id} size={34} />
+                        {isActive && (
+                          <span className="hidden sm:inline-flex lg:hidden items-center justify-center w-4 h-4 rounded-full bg-emerald-600 text-white shrink-0">
+                            <Check className="w-2.5 h-2.5" />
+                          </span>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1 w-full">
                         <div className="flex items-center justify-between gap-1">
                           <p className="text-xs font-semibold text-slate-900">
                             {seed.numberLabel} — {seed.name}
                           </p>
                           {isActive && (
-                            <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-emerald-600 text-white shrink-0">
+                            <span className="inline-flex sm:hidden lg:inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-emerald-600 text-white shrink-0">
                               <Check className="w-2.5 h-2.5" />
                             </span>
                           )}

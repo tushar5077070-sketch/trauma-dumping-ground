@@ -89,18 +89,18 @@ export const InfoModals: React.FC<InfoModalProps> = ({
                 <p className="text-xs text-slate-600 mt-1 mb-2.5 leading-relaxed">
                   Click “Plant a Seed” to open the writing sanctuary and select the seed that best reflects what you are releasing today:
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {SEED_OPTIONS.map((seed) => (
                     <div
                       key={seed.id}
-                      className="flex items-center gap-2 p-2 rounded-xl bg-white border border-slate-200/70"
+                      className="flex flex-row sm:flex-col items-center sm:items-start gap-2.5 sm:gap-1.5 p-2.5 rounded-xl bg-white border border-slate-200/70"
                     >
                       <SeedIconIllustration seedType={seed.id} size={28} />
                       <div className="min-w-0">
                         <p className="text-xs font-semibold text-slate-800">
                           {seed.name}
                         </p>
-                        <p className="text-[11px] text-slate-500 leading-snug">
+                        <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
                           {seed.tagline}
                         </p>
                       </div>

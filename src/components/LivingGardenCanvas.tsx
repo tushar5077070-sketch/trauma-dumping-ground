@@ -117,19 +117,27 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
 
   const springStateRef = useRef<Record<string, FlowerSpringState>>({});
 
-  // Responsive scale factor adapting to both viewport width and height so flowers are never squished or oversized
+  // Responsive scale factor adapting smoothly across mobile, tablet (portrait/landscape), and laptop
   const deviceScaleMultiplier = useMemo(() => {
+    const w = viewportSize.width;
+    const h = viewportSize.height;
     const wFactor =
-      viewportSize.width < 420
-        ? 0.58
-        : viewportSize.width < 768
-        ? 0.68
+      w < 420
+        ? 0.56
+        : w < 640
+        ? 0.6
+        : w <= 860
+        ? 0.64
+        : w <= 1080
+        ? 0.69
         : 0.78;
     const hFactor =
-      viewportSize.height < 500
-        ? 0.54
-        : viewportSize.height < 660
-        ? 0.66
+      h < 500
+        ? 0.52
+        : h < 660
+        ? 0.64
+        : h <= 840
+        ? 0.72
         : 0.78;
     return Math.min(wFactor, hFactor);
   }, [viewportSize.width, viewportSize.height]);
@@ -503,9 +511,13 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         const padX = 28;
         const padY = 20;
 
-        // TRUE ASPECT-RATIO COVER SCALING: Never stretches or compresses the meadow on any device!
+        // TRUE ASPECT-RATIO SCALING FOR MOBILE, TABLET (4:3 / 3:4), AND LAPTOP (16:9):
+        // On portrait/tablet screens, allow the upper zenith sky gradient to fill the top sky so the meadow photo isn't over-zoomed
+        const aspect = width / Math.max(1, height);
+        const verticalCoverageRatio =
+          aspect < 0.85 ? 0.76 : aspect < 1.35 ? 0.84 : 1.0;
         const targetW = width + padX * 2;
-        const targetH = height + padY * 2;
+        const targetH = height * verticalCoverageRatio + padY * 2;
         const coverScale = Math.max(targetW / srcW, targetH / srcH);
         const destW = srcW * coverScale;
         const destH = srcH * coverScale;
@@ -513,14 +525,19 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         const baseParallaxX = -ptr.parallaxX * 0.7 + Math.sin(t * 0.18) * 3.5;
         const baseParallaxY = -ptr.parallaxY * 0.6;
 
-        // Center horizontally & align the meadow horizon (55% of image) with ~54% of viewport height
+        // Center horizontally & anchor meadow bottom so the horizon aligns consistently across mobile, tablet, and desktop
         const destX = (width - destW) * 0.5 + baseParallaxX;
-        const destY = height * 0.54 - destH * 0.54 + baseParallaxY;
+        const rawDestY = height * 0.55 - destH * 0.54 + baseParallaxY;
+        const minBottomAlignedY = height + padY - destH + baseParallaxY;
+        const destY = Math.max(rawDestY, minBottomAlignedY);
 
-        // Fill upper sky if tall portrait screen extends above destY
+        // Seamlessly fill upper zenith sky if portrait/tablet screen extends above destY
         if (destY > 0) {
-          bgCtx.fillStyle = '#49A0DC';
-          bgCtx.fillRect(0, 0, width, destY + 2);
+          const zenithGrad = bgCtx.createLinearGradient(0, 0, 0, destY + 4);
+          zenithGrad.addColorStop(0, '#4197D7');
+          zenithGrad.addColorStop(1, '#49A0DC');
+          bgCtx.fillStyle = zenithGrad;
+          bgCtx.fillRect(0, 0, width, destY + 4);
         }
 
         // 1A. Continuous full-image cover pass (zero seam line & zero compression!)
@@ -782,7 +799,11 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         const isHighlighted = activeHighlightId === s.storyId;
 
         const safePosX =
-          width < 640 ? 10 + (s.positionX / 100) * 80 : s.positionX;
+          width < 640
+            ? 10 + (s.positionX / 100) * 80
+            : width <= 1024
+            ? 7 + (s.positionX / 100) * 86
+            : s.positionX;
         const flowerX = (safePosX / 100) * width;
         const flowerY =
           height - (s.positionY * 0.72 * meadowHeightPx) / 100 - 50;
@@ -832,9 +853,8 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
             (!activeHoverId && s.storyId === activeHighlightId))
         ) {
           const bendOffsetPx = st.angle * 1.1;
-          const isMobileScreen = width < 640;
-          const minX = isMobileScreen ? 24 : 12;
-          const maxX = isMobileScreen ? 76 : 88;
+          const minX = width < 640 ? 24 : width <= 1024 ? 16 : 12;
+          const maxX = width < 640 ? 76 : width <= 1024 ? 84 : 88;
           const clampedX = Math.max(minX, Math.min(maxX, safePosX));
           const flowerTopOffsetPx = Math.round(135 * st.scale);
           popupCardRef.current.style.left = `calc(${clampedX}% + ${bendOffsetPx.toFixed(
@@ -927,6 +947,8 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
           const safePosX =
             viewportSize.width < 640
               ? 10 + (story.positionX / 100) * 80
+              : viewportSize.width <= 1024
+              ? 7 + (story.positionX / 100) * 86
               : story.positionX;
 
           return (

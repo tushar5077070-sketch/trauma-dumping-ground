@@ -370,14 +370,14 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
           )}
         </div>
 
-        {/* Pinned Always-Visible Action Footer (Responsive 2x2 grid on mobile, single row on desktop) */}
-        <div className="shrink-0 px-4 sm:px-7 py-3 sm:py-4 bg-white/95 border-t border-slate-200/70 grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
+        {/* Pinned Always-Visible Action Footer (Balanced 2x2 grid on mobile & small tablet, single row on md+) */}
+        <div className="shrink-0 px-4 sm:px-6 md:px-7 py-3 sm:py-4 bg-white/95 border-t border-slate-200/70 grid grid-cols-2 md:flex md:flex-nowrap items-center gap-2">
           {/* 1. Send a little warmth */}
           <button
             type="button"
             onClick={handleSendWarmth}
             disabled={warmthSent}
-            className={`px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+            className={`px-3 md:px-3.5 py-2 sm:py-2.5 rounded-xl text-[11px] sm:text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
               warmthSent
                 ? 'bg-rose-100 text-rose-800 border border-rose-200'
                 : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80'
@@ -400,7 +400,7 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
           <button
             type="button"
             onClick={() => setShowMessageComposer((prev) => !prev)}
-            className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200/80 text-[11px] sm:text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+            className="px-3 md:px-3.5 py-2 sm:py-2.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200/80 text-[11px] sm:text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
           >
             <MessageCircleHeart className="w-3.5 h-3.5 text-sky-600 shrink-0" />
             <span>Leave a kind message</span>
@@ -413,7 +413,7 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
               soundscape.playBloomChord();
               onReadAnother();
             }}
-            className="px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-[11px] sm:text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+            className="px-3 md:px-3.5 py-2 sm:py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-800 text-[11px] sm:text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
           >
             <Shuffle className="w-3.5 h-3.5 text-slate-600 shrink-0" />
             <span>Read another story</span>
@@ -423,7 +423,7 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="sm:ml-auto px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[11px] sm:text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+            className="md:ml-auto px-3 md:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[11px] sm:text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
           >
             <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
             <span>Back to the garden</span>

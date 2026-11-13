@@ -206,7 +206,6 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
     let topSkyColor = '#53B2ED';
 
     const refImage = new Image();
-    refImage.crossOrigin = 'anonymous';
     refImage.src = cleanMeadowSkyImg;
     refImage.onload = () => {
       const w = refImage.naturalWidth || 1408;

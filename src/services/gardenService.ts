@@ -71,12 +71,17 @@ export async function ensureInitialStoriesSeeded(): Promise<void> {
   try {
     const q = query(collection(db, path), where('moderationStatus', '==', 'approved'));
     const snap = await getDocs(q);
-    if (!snap.empty) {
+    const existingIds = new Set(snap.docs.map((d) => d.id));
+    const missingStories = INITIAL_GARDEN_STORIES.filter(
+      (item) => !existingIds.has(item.storyId)
+    );
+
+    if (missingStories.length === 0) {
       return;
     }
 
     const batch = writeBatch(db);
-    for (const item of INITIAL_GARDEN_STORIES) {
+    for (const item of missingStories) {
       const storyRef = doc(db, 'stories', item.storyId);
       batch.set(storyRef, {
         storyId: item.storyId,
@@ -271,8 +276,8 @@ function findHarmoniousPosition(existing: Story[]): {
   let maxMinDist = -1;
 
   for (let attempt = 0; attempt < 24; attempt++) {
-    const candidateX = Number((8 + Math.random() * 84).toFixed(2));
-    const candidateY = Number((22 + Math.random() * 54).toFixed(2));
+    const candidateX = Number((6 + Math.random() * 88).toFixed(2));
+    const candidateY = Number((12 + Math.random() * 70).toFixed(2));
 
     let minDist = 9999;
     for (const s of existing) {
@@ -290,9 +295,9 @@ function findHarmoniousPosition(existing: Story[]): {
   }
 
   // Scale naturally increases closer to the foreground (lower positionY = closer to viewer)
-  const depthFactor = 1 - (bestY - 20) / 70;
+  const depthFactor = 1 - (bestY - 12) / 76;
   const computedScale = Number(
-    Math.max(0.85, Math.min(1.28, 0.92 + depthFactor * 0.32)).toFixed(2)
+    Math.max(0.78, Math.min(1.3, 0.8 + depthFactor * 0.48)).toFixed(2)
   );
 
   return { positionX: bestX, positionY: bestY, scale: computedScale };

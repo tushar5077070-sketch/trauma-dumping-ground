@@ -208,7 +208,7 @@ export default function App() {
               Some things are too heavy to carry alone. Leave your story here, and let it grow into something beautiful.
             </p>
 
-            <div className="pt-1 sm:pt-2 pointer-events-auto flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+            <div className="pt-1 sm:pt-2 pointer-events-auto flex items-center justify-center">
               <button
                 type="button"
                 onClick={() => {
@@ -219,15 +219,6 @@ export default function App() {
               >
                 <Compass className="w-3.5 h-3.5 text-white shrink-0" />
                 <span>Tap on a flower to discover someone's story.</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsWriteModalOpen(true)}
-                className="inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 md:px-5 py-1.5 sm:py-2 rounded-full bg-white/92 hover:bg-white text-slate-900 text-xs sm:text-sm font-medium shadow-sm transition-all cursor-pointer"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span>Plant a Seed 🌱</span>
               </button>
             </div>
           </div>

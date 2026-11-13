@@ -1,0 +1,106 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-serif: 'Cormorant Garamond', Georgia, serif;
+    --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #62b6e8;
+    color: #1e293b;
+    overflow: hidden;
+    user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, .font-editorial {
+    font-family: var(--font-serif);
+  }
+}
+
+@keyframes floatCloudSlow {
+  0% {
+    transform: translate3d(-4%, 0, 0);
+  }
+  50% {
+    transform: translate3d(4%, -1.5%, 0);
+  }
+  100% {
+    transform: translate3d(-4%, 0, 0);
+  }
+}
+
+@keyframes floatCloudMedium {
+  0% {
+    transform: translate3d(3%, 0, 0);
+  }
+  50% {
+    transform: translate3d(-5%, 1%, 0);
+  }
+  100% {
+    transform: translate3d(3%, 0, 0);
+  }
+}
+
+@keyframes petalBreathe {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.035) rotate(1.2deg);
+  }
+}
+
+@keyframes pulseAura {
+  0%, 100% {
+    opacity: 0.45;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.08);
+  }
+}
+
+.animate-cloud-slow {
+  animation: floatCloudSlow 64s ease-in-out infinite;
+}
+
+.animate-cloud-medium {
+  animation: floatCloudMedium 46s ease-in-out infinite;
+}
+
+.animate-petal-breathe {
+  animation: petalBreathe 5.5s ease-in-out infinite;
+}
+
+.animate-pulse-aura {
+  animation: pulseAura 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-cloud-slow,
+  .animate-cloud-medium,
+  .animate-petal-breathe,
+  .animate-pulse-aura {
+    animation: none !important;
+  }
+}
+
+/* Custom subtle scrollbars for story reading & writing panes */
+.garden-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.garden-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.garden-scroll::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.25);
+  border-radius: 9999px;
+}
+.garden-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.4);
+}

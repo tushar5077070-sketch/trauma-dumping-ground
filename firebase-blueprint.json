@@ -1,0 +1,248 @@
+{
+  "entities": {
+    "Story": {
+      "title": "Story",
+      "description": "An anonymous emotional story planted as a seed in the living meadow.",
+      "type": "object",
+      "properties": {
+        "storyId": {
+          "type": "string",
+          "description": "Unique identifier for the story document.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "anonymousId": {
+          "type": "string",
+          "description": "Generated anonymous soul identifier (e.g., Anonymous Soul #1048).",
+          "minLength": 5,
+          "maxLength": 40,
+          "pattern": "^Anonymous Soul #[0-9]{3,6}$"
+        },
+        "content": {
+          "type": "string",
+          "description": "The anonymous trauma or emotional experience written by the visitor.",
+          "minLength": 5,
+          "maxLength": 2000
+        },
+        "seedType": {
+          "type": "string",
+          "description": "The chosen seed archetype for the story.",
+          "enum": ["daisy", "sunflower", "lavender"]
+        },
+        "flowerVariant": {
+          "type": "string",
+          "description": "The visual flower variety rendered in the meadow.",
+          "enum": ["pink-tulip", "yellow-tulip", "orange-tulip", "purple-wildflower", "daisy", "sunflower", "lavender"]
+        },
+        "contentWarning": {
+          "type": "string",
+          "description": "Optional content warning note (empty string if none).",
+          "minLength": 0,
+          "maxLength": 120
+        },
+        "moderationStatus": {
+          "type": "string",
+          "description": "Moderation visibility status of the story.",
+          "enum": ["approved", "flagged", "removed"]
+        },
+        "warmthCount": {
+          "type": "integer",
+          "description": "Total supportive warmth reactions sent to this flower."
+        },
+        "messageCount": {
+          "type": "integer",
+          "description": "Total supportive kind messages left on this flower."
+        },
+        "positionX": {
+          "type": "number",
+          "description": "Horizontal percentage position in the flower meadow (2 to 98)."
+        },
+        "positionY": {
+          "type": "number",
+          "description": "Depth percentage position in the flower meadow (5 to 88)."
+        },
+        "scale": {
+          "type": "number",
+          "description": "Visual scale multiplier for natural variation (0.5 to 1.4)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the seed was planted."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the flower was last updated."
+        }
+      },
+      "required": [
+        "storyId",
+        "anonymousId",
+        "content",
+        "seedType",
+        "flowerVariant",
+        "contentWarning",
+        "moderationStatus",
+        "warmthCount",
+        "messageCount",
+        "positionX",
+        "positionY",
+        "scale",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Reaction": {
+      "title": "Reaction",
+      "description": "A supportive reaction sent to an anonymous flower.",
+      "type": "object",
+      "properties": {
+        "reactionId": {
+          "type": "string",
+          "description": "Unique identifier for the reaction document.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "storyId": {
+          "type": "string",
+          "description": "Parent story ID receiving the warmth reaction.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "reactionType": {
+          "type": "string",
+          "description": "Type of supportive warmth sent.",
+          "enum": ["warmth", "sunlight", "gentle-rain"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the reaction was created."
+        }
+      },
+      "required": ["reactionId", "storyId", "reactionType", "createdAt"]
+    },
+    "SupportiveMessage": {
+      "title": "SupportiveMessage",
+      "description": "An anonymous kind message left for a story author.",
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "description": "Unique identifier for the message document.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "storyId": {
+          "type": "string",
+          "description": "Parent story ID this message supports.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "anonymousId": {
+          "type": "string",
+          "description": "Anonymous responder label (e.g., Kind Gardener #402).",
+          "minLength": 5,
+          "maxLength": 40,
+          "pattern": "^Kind Gardener #[0-9]{3,6}$"
+        },
+        "content": {
+          "type": "string",
+          "description": "Supportive message content.",
+          "minLength": 2,
+          "maxLength": 500
+        },
+        "moderationStatus": {
+          "type": "string",
+          "description": "Moderation status of the supportive message.",
+          "enum": ["approved", "flagged", "removed"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the message was created."
+        }
+      },
+      "required": ["messageId", "storyId", "anonymousId", "content", "moderationStatus", "createdAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "A content moderation report for harmful or inappropriate submissions.",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "description": "Unique identifier for the report.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "targetType": {
+          "type": "string",
+          "description": "Whether a story or message is being reported.",
+          "enum": ["story", "message"]
+        },
+        "targetId": {
+          "type": "string",
+          "description": "ID of the reported item.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "storyId": {
+          "type": "string",
+          "description": "Associated story ID.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Reason category for reporting.",
+          "enum": ["self-harm", "harassment", "spam", "pii", "other"]
+        },
+        "details": {
+          "type": "string",
+          "description": "Optional additional context.",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "status": {
+          "type": "string",
+          "description": "Review status of the report.",
+          "enum": ["pending", "reviewed"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the report was submitted."
+        }
+      },
+      "required": ["reportId", "targetType", "targetId", "storyId", "reason", "details", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/stories/{storyId}": {
+      "schema": "Story",
+      "description": "Top-level collection of anonymous stories planted as flowers in the garden."
+    },
+    "/stories/{storyId}/reactions/{reactionId}": {
+      "schema": "Reaction",
+      "description": "Subcollection of warmth reactions for a specific story."
+    },
+    "/stories/{storyId}/messages/{messageId}": {
+      "schema": "SupportiveMessage",
+      "description": "Subcollection of supportive messages for a specific story."
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Collection of moderation reports submitted by visitors."
+    }
+  }
+}

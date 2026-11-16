@@ -585,8 +585,7 @@ service cloud.firestore {
           exists(/databases/$(database)/documents/stories/$(storyId)) &&
           get(/databases/$(database)/documents/stories/$(storyId)).data.moderationStatus == 'approved';
 
-        allow list: if existing().storyId == storyId &&
-          existing().reactionType in ['warmth', 'sunlight', 'gentle-rain'];
+        allow list: if existing().reactionType in ['warmth', 'sunlight', 'gentle-rain'] || isAdmin();
 
         allow create: if isValidId(storyId) &&
           isValidId(reactionId) &&
@@ -611,8 +610,7 @@ service cloud.firestore {
           exists(/databases/$(database)/documents/stories/$(storyId)) &&
           get(/databases/$(database)/documents/stories/$(storyId)).data.moderationStatus == 'approved';
 
-        allow list: if existing().storyId == storyId &&
-          existing().moderationStatus == 'approved';
+        allow list: if existing().moderationStatus == 'approved' || isAdmin();
 
         allow create: if isValidId(storyId) &&
           isValidId(messageId) &&

@@ -385,9 +385,15 @@ export function subscribeToStoryMessages(
   storyId: string,
   onUpdate: (messages: SupportiveMessage[]) => void
 ): () => void {
-  const path = `stories/${storyId}/messages`;
+  const cleanStoryId = storyId.trim();
+  if (!cleanStoryId || !/^[a-zA-Z0-9_-]{1,64}$/.test(cleanStoryId)) {
+    onUpdate([]);
+    return () => {};
+  }
+
+  const path = `stories/${cleanStoryId}/messages`;
   const q = query(
-    collection(db, 'stories', storyId, 'messages'),
+    collection(db, 'stories', cleanStoryId, 'messages'),
     where('moderationStatus', '==', 'approved')
   );
 
@@ -399,7 +405,7 @@ export function subscribeToStoryMessages(
         const d = docSnap.data();
         list.push({
           messageId: String(d.messageId || docSnap.id),
-          storyId: String(d.storyId || storyId),
+          storyId: String(d.storyId || cleanStoryId),
           anonymousId: String(d.anonymousId || 'Kind Gardener #402'),
           content: String(d.content || ''),
           moderationStatus: 'approved',
@@ -408,7 +414,7 @@ export function subscribeToStoryMessages(
       });
 
       // Merge any pre-seeded initial supportive messages for initial stories
-      const preset = INITIAL_SUPPORTIVE_MESSAGES[storyId] || [];
+      const preset = INITIAL_SUPPORTIVE_MESSAGES[cleanStoryId] || [];
       for (const p of preset) {
         if (!list.some((m) => m.messageId === p.messageId)) {
           list.push({
@@ -427,7 +433,11 @@ export function subscribeToStoryMessages(
       } catch {
         const raw = localStorage.getItem(LOCAL_MESSAGES_KEY);
         const allLocal: Record<string, SupportiveMessage[]> = raw ? JSON.parse(raw) : {};
-        onUpdate(allLocal[storyId] || []);
+        const preset = (INITIAL_SUPPORTIVE_MESSAGES[cleanStoryId] || []).map((p) => ({
+          ...p,
+          createdAt: new Date(Date.now() - 3600 * 1000 * 3),
+        }));
+        onUpdate(allLocal[cleanStoryId] || preset);
       }
     }
   );

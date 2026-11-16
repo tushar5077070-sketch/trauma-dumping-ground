@@ -386,8 +386,9 @@ export function subscribeToAllReports(
   onError?: (err: Error) => void
 ): () => void {
   const path = 'reports';
+  const q = query(collection(db, path), where('status', 'in', ['pending', 'reviewed']));
   return onSnapshot(
-    collection(db, path),
+    q,
     (snapshot) => {
       const list: ModerationReportRecord[] = [];
       snapshot.forEach((docSnap) => {

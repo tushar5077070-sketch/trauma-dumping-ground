@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import {
   LoginEvent,
+  SECRET_GARDEN_PLANS,
+  SecretGardenMembership,
   SUBSCRIPTION_PLAN_CATALOG,
   SubscriptionRecord,
   UserAccount,
@@ -29,8 +31,10 @@ import {
 interface AccountModalProps {
   isOpen: boolean;
   currentUser: User | null;
+  secretGardenMembership?: SecretGardenMembership | null;
   onClose: () => void;
   onOpenAdminConsole: () => void;
+  onOpenMySpace?: () => void;
 }
 
 function formatDateTime(date: Date): string {
@@ -58,8 +62,10 @@ function formatCurrency(amount: number, currency: string): string {
 export const AccountModal: React.FC<AccountModalProps> = ({
   isOpen,
   currentUser,
+  secretGardenMembership,
   onClose,
   onOpenAdminConsole,
+  onOpenMySpace,
 }) => {
   const [account, setAccount] = useState<UserAccount | null>(null);
   const [ownEvents, setOwnEvents] = useState<LoginEvent[]>([]);
@@ -314,12 +320,43 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                         </p>
                       )}
                     </div>
+                  ) : secretGardenMembership &&
+                    secretGardenMembership.status !== 'free' ? (
+                    <div className="mt-1 space-y-1 text-xs text-slate-600">
+                      <p className="font-medium text-slate-800">
+                        {SECRET_GARDEN_PLANS.find(
+                          (p) => p.id === secretGardenMembership.planId
+                        )?.name || 'The Secret Garden'}{' '}
+                        ·{' '}
+                        <span className="capitalize">
+                          {secretGardenMembership.status}
+                        </span>
+                      </p>
+                      {secretGardenMembership.trialEndsAt && (
+                        <p className="text-[11px] text-slate-500">
+                          Trial window ends: {secretGardenMembership.trialEndsAt}
+                        </p>
+                      )}
+                    </div>
                   ) : (
                     <p className="text-xs text-slate-500 mt-0.5">
-                      No paid subscription plan has been recorded for your account yet.
+                      Currently on the Open Meadow Free Plan (₹0).
                     </p>
                   )}
                 </div>
+
+                {onOpenMySpace && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onClose();
+                      onOpenMySpace();
+                    }}
+                    className="text-xs font-medium text-rose-700 hover:text-rose-800 underline underline-offset-2 cursor-pointer"
+                  >
+                    Open My Space & Secret Garden Membership →
+                  </button>
+                )}
               </div>
 
               {/* Recent Login Sessions */}

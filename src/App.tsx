@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { User } from 'firebase/auth';
 import {
   Volume2,
@@ -13,14 +13,38 @@ import {
   Compass,
   LogIn,
   ShieldCheck,
+  BookHeart,
 } from 'lucide-react';
-import { INITIAL_GARDEN_STORIES, SeedType, Story } from './types/garden';
+import {
+  DEFAULT_GARDEN_CUSTOMISATION,
+  DiaryEntry,
+  GardenCustomisationSettings,
+  INITIAL_GARDEN_STORIES,
+  SavedMemory,
+  SecretGardenMembership,
+  SeedType,
+  Story,
+  SupportiveMessage,
+  VoiceJournal,
+} from './types/garden';
 import { subscribeToApprovedStories } from './services/gardenService';
 import {
   ensureUserAccountSynced,
   isVerifiedAdminUser,
   subscribeToAuthState,
 } from './services/authAccountService';
+import {
+  cancelOrExpireMembership,
+  hasEffectiveSecretGardenAccess,
+  isTrialExpired,
+  saveCommunityStoryMemory,
+  saveGardenCustomisationForUser,
+  saveSupportiveReplyMemory,
+  subscribeToPersonalDiary,
+  subscribeToSavedMemories,
+  subscribeToSecretGardenMembership,
+  subscribeToVoiceJournals,
+} from './services/secretGardenService';
 import { soundscape } from './utils/soundscape';
 import { LivingGardenCanvas } from './components/LivingGardenCanvas';
 import { WriteStoryModal } from './components/WriteStoryModal';
@@ -28,6 +52,8 @@ import { StoryReaderModal } from './components/StoryReaderModal';
 import { InfoModals } from './components/InfoModals';
 import { AccountModal } from './components/AccountModal';
 import { AdminBackendModal } from './components/AdminBackendModal';
+import { MySpaceModal } from './components/MySpaceModal';
+import { SecretGardenUpgradeModal } from './components/SecretGardenUpgradeModal';
 
 export default function App() {
   const [stories, setStories] = useState<Story[]>(() =>
@@ -51,6 +77,17 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [isMySpaceOpen, setIsMySpaceOpen] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [upgradeFocusFeature, setUpgradeFocusFeature] = useState<string | null>(
+    null
+  );
+
+  const [secretMembership, setSecretMembership] =
+    useState<SecretGardenMembership | null>(null);
+  const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
+  const [voiceJournals, setVoiceJournals] = useState<VoiceJournal[]>([]);
+  const [memories, setMemories] = useState<SavedMemory[]>([]);
 
   const visitedStoryIdsRef = useRef<Set<string>>(new Set());
 
@@ -70,6 +107,56 @@ export default function App() {
     });
     return () => unsubscribeAuth();
   }, []);
+
+  const isAdmin = isVerifiedAdminUser(currentUser);
+  const hasPremiumAccess = hasEffectiveSecretGardenAccess(
+    secretMembership,
+    isAdmin
+  );
+
+  useEffect(() => {
+    if (!currentUser) {
+      setSecretMembership(null);
+      setDiaryEntries([]);
+      setVoiceJournals([]);
+      setMemories([]);
+      return;
+    }
+
+    const unsubMembership = subscribeToSecretGardenMembership(
+      currentUser.uid,
+      (m) => {
+        setSecretMembership(m);
+        if (m && isTrialExpired(m)) {
+          cancelOrExpireMembership(currentUser.uid, 'expired').catch(() => {});
+        }
+      },
+      () => {}
+    );
+
+    const unsubDiary = subscribeToPersonalDiary(
+      currentUser.uid,
+      setDiaryEntries,
+      () => {}
+    );
+    const unsubVoice = subscribeToVoiceJournals(
+      currentUser.uid,
+      setVoiceJournals,
+      () => {}
+    );
+    const unsubMemories = subscribeToSavedMemories(
+      currentUser.uid,
+      setMemories,
+      () => {}
+    );
+
+    return () => {
+      unsubMembership();
+      unsubDiary();
+      unsubVoice();
+      unsubMemories();
+    };
+  }, [currentUser]);
 
   const handleSelectStory = useCallback((story: Story) => {
     visitedStoryIdsRef.current.add(story.storyId);
@@ -118,7 +205,65 @@ export default function App() {
     setIsSoundEnabled(nextState);
   };
 
-  const isAdmin = isVerifiedAdminUser(currentUser);
+  const activeGardenCustomisation: GardenCustomisationSettings = useMemo(() => {
+    if (!hasPremiumAccess || !secretMembership) {
+      return DEFAULT_GARDEN_CUSTOMISATION;
+    }
+    return {
+      gardenTheme: secretMembership.gardenTheme || 'meadow',
+      gardenBackground: secretMembership.gardenBackground || 'classic_sky',
+      gardenEffect: secretMembership.gardenEffect || 'breeze',
+      exclusiveFloraPreset: secretMembership.exclusiveFloraPreset || 'classic',
+    };
+  }, [hasPremiumAccess, secretMembership]);
+
+  const savedMemorySourceIds = useMemo(
+    () => new Set(memories.map((m) => m.sourceId)),
+    [memories]
+  );
+
+  const handleUpdateCustomisation = async (
+    next: GardenCustomisationSettings
+  ) => {
+    if (currentUser) {
+      await saveGardenCustomisationForUser(
+        currentUser.uid,
+        next,
+        hasPremiumAccess,
+        secretMembership
+      );
+    }
+  };
+
+  const handleOpenUpgrade = (featureName?: string) => {
+    setUpgradeFocusFeature(featureName || null);
+    setIsUpgradeModalOpen(true);
+  };
+
+  const handleSaveStoryToMemory = async (story: Story) => {
+    if (!currentUser || !hasPremiumAccess) {
+      handleOpenUpgrade('My Memories');
+      return;
+    }
+    await saveCommunityStoryMemory(currentUser.uid, story, 'Quiet Comfort');
+  };
+
+  const handleSaveMessageToMemory = async (
+    msg: SupportiveMessage,
+    story: Story
+  ) => {
+    if (!currentUser || !hasPremiumAccess) {
+      handleOpenUpgrade('My Memories');
+      return;
+    }
+    await saveSupportiveReplyMemory(
+      currentUser.uid,
+      msg,
+      story.flowerVariant,
+      'Kind Words'
+    );
+  };
+
   const firstName =
     currentUser?.displayName?.trim().split(/\s+/)[0] ||
     currentUser?.email?.split('@')[0] ||
@@ -131,6 +276,7 @@ export default function App() {
         stories={stories}
         onSelectStory={handleSelectStory}
         highlightedStoryId={highlightedStoryId}
+        gardenCustomisation={activeGardenCustomisation}
       />
 
       {/* 2. Top Navigation & Sky Sanctuary Overlay — Responsive Across Mobile, Tablet (Portrait/Landscape) & Laptop */}
@@ -168,7 +314,7 @@ export default function App() {
             <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-2.5 md:gap-4 lg:gap-5 shrink-0">
               <nav
                 aria-label="Primary navigation"
-                className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2 sm:gap-2.5 md:gap-4 lg:gap-5 text-xs md:text-sm font-medium text-white/95"
+                className="flex flex-wrap sm:flex-nowrap items-center justify-between sm:justify-end w-full sm:w-auto gap-1.5 min-[400px]:gap-2 sm:gap-2.5 md:gap-4 lg:gap-5 text-xs md:text-sm font-medium text-white/95"
               >
                 <button
                   type="button"
@@ -183,6 +329,15 @@ export default function App() {
                   className="py-1 hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
                 >
                   How It Works
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsMySpaceOpen(true)}
+                  className="inline-flex items-center gap-1.5 py-1 px-2 sm:px-2.5 rounded-full bg-rose-100/20 hover:bg-rose-100/35 border border-rose-100/40 text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
+                  title="Open your private My Space"
+                >
+                  <BookHeart className="w-3.5 h-3.5 text-rose-100 shrink-0" />
+                  <span>My Space</span>
                 </button>
                 <button
                   type="button"
@@ -316,6 +471,11 @@ export default function App() {
         onClose={() => setActiveStory(null)}
         onReadAnother={handleReadRandomStory}
         onLocalStoryWarmthIncrement={handleLocalStoryWarmthIncrement}
+        canSaveMemories={Boolean(currentUser && hasPremiumAccess)}
+        savedSourceIds={savedMemorySourceIds}
+        onSaveStoryToMemory={handleSaveStoryToMemory}
+        onSaveMessageToMemory={handleSaveMessageToMemory}
+        onRequestUnlockMemories={() => handleOpenUpgrade('My Memories')}
       />
 
       {/* 5. Write Your Story & Planting Animation Modal */}
@@ -340,8 +500,10 @@ export default function App() {
       <AccountModal
         isOpen={isAccountModalOpen}
         currentUser={currentUser}
+        secretGardenMembership={secretMembership}
         onClose={() => setIsAccountModalOpen(false)}
         onOpenAdminConsole={() => setIsAdminModalOpen(true)}
+        onOpenMySpace={() => setIsMySpaceOpen(true)}
       />
 
       {/* 8. Admin Backend Logins & Subscriptions Console */}
@@ -349,6 +511,34 @@ export default function App() {
         isOpen={isAdminModalOpen}
         currentUser={currentUser}
         onClose={() => setIsAdminModalOpen(false)}
+      />
+
+      {/* 9. My Space Personal Sanctuary Dashboard & Five Premium Features */}
+      <MySpaceModal
+        isOpen={isMySpaceOpen}
+        currentUser={currentUser}
+        membership={secretMembership}
+        hasPremiumAccess={hasPremiumAccess}
+        isAdmin={isAdmin}
+        diaryEntries={diaryEntries}
+        voiceJournals={voiceJournals}
+        memories={memories}
+        gardenCustomisation={activeGardenCustomisation}
+        onUpdateCustomisation={handleUpdateCustomisation}
+        onOpenUpgrade={handleOpenUpgrade}
+        onClose={() => setIsMySpaceOpen(false)}
+      />
+
+      {/* 10. The Secret Garden Freemium & Trial Upgrade Modal */}
+      <SecretGardenUpgradeModal
+        isOpen={isUpgradeModalOpen}
+        currentUser={currentUser}
+        membership={secretMembership}
+        initialFocusFeature={upgradeFocusFeature}
+        onClose={() => {
+          setIsUpgradeModalOpen(false);
+          setUpgradeFocusFeature(null);
+        }}
       />
     </div>
   );

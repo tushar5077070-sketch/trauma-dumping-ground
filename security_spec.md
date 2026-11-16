@@ -2,14 +2,16 @@
 
 ## 1. Data Invariants
 1. **Anonymous Public Garden Invariant**: Public garden collections (`/stories`, `/stories/{storyId}/reactions`, `/stories/{storyId}/messages`, `/reports`) must never store email addresses, real names, phone numbers, or user UIDs. Authors are identified strictly by generated pseudonyms matching `^Anonymous Soul #[0-9]{3,6}$` or `^Kind Gardener #[0-9]{3,6}$`.
-2. **PII Isolation & Role Separation**: Login details (`/userAccounts/{userId}`, `/loginEvents/{eventId}`) and subscription plans (`/subscriptions/{subscriptionId}`) are strictly isolated: only the matching authenticated owner (`request.auth.uid == userId` / `uid`) or a verified admin (`isAdmin()`) may `get` or `list` them. Blanket `isSignedIn()` reads are forbidden.
+2. **PII Isolation & Role Separation**: Login details (`/userAccounts/{userId}`, `/loginEvents/{eventId}`) and subscription plans (`/subscriptions/{subscriptionId}`, `/secretGardenMemberships/{userId}`) are strictly isolated: only the matching authenticated owner (`request.auth.uid == userId` / `uid`) or a verified admin (`isAdmin()`) may `get` or `list` them. Blanket `isSignedIn()` reads are forbidden.
 3. **Anti-Privilege-Escalation**: Users creating their own `/userAccounts/{userId}` document must set `role == 'member'` and `loginCount == 1`, and cannot mutate `role` on update. Only `isAdmin()` can create, update, or delete `/subscriptions/{subscriptionId}` records.
 4. **Moderation Visibility Gate**: Only stories and supportive messages with `moderationStatus == 'approved'` may be read (`get` or `list`) by visitors. Any story with `moderationStatus == 'removed'` is locked in a terminal state and cannot be updated.
 5. **Relational Integrity (Master Gate)**: A `Reaction` or `SupportiveMessage` under `/stories/{storyId}/...` can only be created if `/stories/{storyId}` exists and its `moderationStatus == 'approved'`. A `LoginEvent` requires `existsAfter` of `/userAccounts/{uid}`. A `Subscription` requires `exists(/userAccounts/{userId})`.
 6. **Immutable Core Story & Audit Fields**: Once planted, a story's core content and coordinates cannot be mutated. `LoginEvent` records are strictly append-only (`update, delete: false`).
-7. **Strict Volumetric & Temporal Bounds**: All document IDs must match `^[a-zA-Z0-9_\-]{1,64}$`. All strings must respect strict `.size()` boundaries. All `createdAt`, `updatedAt`, `lastLoginAt`, and `loggedInAt` timestamps must equal `request.time`.
+7. **Strict Volumetric & Temporal Bounds**: All document IDs must match `^[a-zA-Z0-9_\-]{1,64}$`. All strings must respect strict `.size()` boundaries. All `createdAt`, `updatedAt`, `lastLoginAt`, `loggedInAt`, and `savedAt` timestamps must equal `request.time`.
+8. **My Space Private Data Isolation**: `/userAccounts/{userId}/personalDiary/{entryId}`, `/userAccounts/{userId}/voiceJournals/{voiceId}`, and `/userAccounts/{userId}/memories/{memoryId}` are strictly restricted to `isOwner(userId)` (`request.auth.uid == userId`). Neither other visitors nor admins may read, list, create, update, or delete another user's private diary, voice recordings, or memories.
+9. **Backend Secret Garden Entitlement Enforcement**: Creating or updating private diary entries, voice journals, or saved memories is gated in Firestore rules via `hasSecretGardenAccess(userId)` (`/secretGardenMemberships/{userId}.status in ['trialing', 'active']`). Exclusive garden customisations (`gardenTheme != 'meadow'`, `gardenBackground != 'classic_sky'`, `gardenEffect != 'breeze'`, `exclusiveFloraPreset != 'classic'`) are blocked when `status == 'free'`. `hasUsedFreeTrial` cannot reset from `true` to `false`, and trials strictly enforce `autoRenew == false`.
 
-## 2. The "Dirty Dozen" Payloads
+## 2. The "Dirty Dozen+" Payloads
 
 1. **Shadow Field Injection on Story Creation**:
    `{ storyId: "story_1", ..., isAdmin: true }` -> Rejected by `data.keys().hasOnly(...)`.
@@ -33,6 +35,13 @@
     Creating or updating `/userAccounts/{uid}` with `{ role: "admin" }` -> Rejected by `incoming().role == 'member'` on create and `incoming().role == existing().role` for owner update.
 11. **Non-Admin Subscription Forgery**:
     Regular authenticated user attempting `setDoc(doc(db, 'subscriptions/sub_1'), { planName: "sanctuary", status: "active", ... })` -> Rejected by `allow create: if isAdmin() && ...`.
-12. **Unauthorized Blanket Listing of User Accounts / Login Events**:
+12. **Unauthorized Listing of User Accounts / Login Events**:
     Non-admin visitor attempting `getDocs(collection(db, 'userAccounts'))` or `getDocs(collection(db, 'loginEvents'))` without owner filter -> Rejected because `allow list` requires `isAdmin() || existing().uid == request.auth.uid`.
-
+13. **Cross-User Private Diary Read Attempt**:
+    User A attempting `get` or `list` on `/userAccounts/user_B/personalDiary` -> Rejected strictly by `isOwner(userId)`.
+14. **Free-Tier Diary Creation Bypass**:
+    User on Free Plan (`status == 'free'`) attempting to create `/userAccounts/{uid}/personalDiary/entry_1` -> Rejected by `hasSecretGardenAccess(userId)`.
+15. **Infinite Free Trial Reset / Trial Auto-Renew Injection**:
+    User updating `/secretGardenMemberships/{uid}` with `hasUsedFreeTrial: false` after already using trial, or `status: 'trialing', autoRenew: true` -> Rejected by membership transition invariants.
+16. **Free-Tier Exclusive Garden Theme Spoofing**:
+    User on Free Plan attempting `gardenTheme: 'twilight'` -> Rejected by customisation entitlement check.

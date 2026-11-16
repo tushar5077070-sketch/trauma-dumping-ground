@@ -35,6 +35,20 @@ service cloud.firestore {
          request.auth.token.email == 'tushar5077070@gmail.com');
     }
 
+    function hasSecretGardenAccess(userId) {
+      return isAdmin() || (
+        exists(/databases/$(database)/documents/secretGardenMemberships/$(userId)) &&
+        get(/databases/$(database)/documents/secretGardenMemberships/$(userId)).data.status in ['trialing', 'active']
+      );
+    }
+
+    function isBasicFreeGardenCustomisation(data) {
+      return data.gardenTheme == 'meadow' &&
+        data.gardenBackground == 'classic_sky' &&
+        data.gardenEffect == 'breeze' &&
+        data.exclusiveFloraPreset == 'classic';
+    }
+
     // 3. Entity Validation Blueprints (Synchronized with firebase-blueprint.json)
     function isValidStory(data) {
       return data.keys().hasAll([
@@ -317,6 +331,216 @@ service cloud.firestore {
         data.updatedAt is timestamp;
     }
 
+    function isValidSecretGardenMembership(data) {
+      return data.keys().hasAll([
+          'userId',
+          'planId',
+          'status',
+          'hasUsedFreeTrial',
+          'trialStartedAt',
+          'trialEndsAt',
+          'billingCycle',
+          'priceInr',
+          'startedAt',
+          'nextBillingAt',
+          'autoRenew',
+          'paymentMode',
+          'gardenTheme',
+          'gardenBackground',
+          'gardenEffect',
+          'exclusiveFloraPreset',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'userId',
+          'planId',
+          'status',
+          'hasUsedFreeTrial',
+          'trialStartedAt',
+          'trialEndsAt',
+          'billingCycle',
+          'priceInr',
+          'startedAt',
+          'nextBillingAt',
+          'autoRenew',
+          'paymentMode',
+          'gardenTheme',
+          'gardenBackground',
+          'gardenEffect',
+          'exclusiveFloraPreset',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.userId) &&
+        data.planId is string &&
+        data.planId in ['free', 'secret_garden_monthly', 'secret_garden_annual'] &&
+        data.status is string &&
+        data.status in ['free', 'trialing', 'active', 'cancelled', 'expired'] &&
+        data.hasUsedFreeTrial is bool &&
+        data.trialStartedAt is string &&
+        data.trialStartedAt.size() <= 40 &&
+        data.trialEndsAt is string &&
+        data.trialEndsAt.size() <= 40 &&
+        data.billingCycle is string &&
+        data.billingCycle in ['none', 'monthly', 'annual'] &&
+        data.priceInr is int &&
+        data.priceInr in [0, 99, 799] &&
+        data.startedAt is string &&
+        data.startedAt.size() <= 40 &&
+        data.nextBillingAt is string &&
+        data.nextBillingAt.size() <= 40 &&
+        data.autoRenew is bool &&
+        data.paymentMode is string &&
+        data.paymentMode in ['none', 'trial_no_card', 'demo_checkout', 'admin_assigned'] &&
+        data.gardenTheme is string &&
+        data.gardenTheme in ['meadow', 'twilight', 'blossom_mist', 'golden_hour'] &&
+        data.gardenBackground is string &&
+        data.gardenBackground in ['classic_sky', 'pastel_dawn', 'starlit_dusk', 'dew_morning'] &&
+        data.gardenEffect is string &&
+        data.gardenEffect in ['breeze', 'fireflies', 'sakura_drift', 'sunbeams'] &&
+        data.exclusiveFloraPreset is string &&
+        data.exclusiveFloraPreset in ['classic', 'moonlight_iris', 'pastel_peony', 'golden_lotus'] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp &&
+        (data.status != 'trialing' || (data.hasUsedFreeTrial == true && data.autoRenew == false && data.priceInr == 0 && data.paymentMode == 'trial_no_card')) &&
+        (data.status != 'free' || (data.planId == 'free' && data.priceInr == 0 && data.autoRenew == false)) &&
+        (data.status in ['trialing', 'active'] || isBasicFreeGardenCustomisation(data));
+    }
+
+    function isValidDiaryEntry(data) {
+      return data.keys().hasAll([
+          'entryId',
+          'userId',
+          'title',
+          'content',
+          'moodTag',
+          'entryDate',
+          'isMemorySaved',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'entryId',
+          'userId',
+          'title',
+          'content',
+          'moodTag',
+          'entryDate',
+          'isMemorySaved',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.entryId) &&
+        isValidId(data.userId) &&
+        data.title is string &&
+        data.title.size() <= 120 &&
+        data.content is string &&
+        data.content.size() >= 1 &&
+        data.content.size() <= 5000 &&
+        data.moodTag is string &&
+        data.moodTag.size() <= 40 &&
+        data.entryDate is string &&
+        data.entryDate.size() >= 4 &&
+        data.entryDate.size() <= 40 &&
+        data.isMemorySaved is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidVoiceJournal(data) {
+      return data.keys().hasAll([
+          'voiceId',
+          'userId',
+          'title',
+          'durationSeconds',
+          'mimeType',
+          'audioDataUrl',
+          'recordedDate',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'voiceId',
+          'userId',
+          'title',
+          'durationSeconds',
+          'mimeType',
+          'audioDataUrl',
+          'recordedDate',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.voiceId) &&
+        isValidId(data.userId) &&
+        data.title is string &&
+        data.title.size() <= 120 &&
+        data.durationSeconds is int &&
+        data.durationSeconds >= 1 &&
+        data.durationSeconds <= 300 &&
+        data.mimeType is string &&
+        data.mimeType.size() >= 5 &&
+        data.mimeType.size() <= 80 &&
+        data.audioDataUrl is string &&
+        data.audioDataUrl.size() >= 10 &&
+        data.audioDataUrl.size() <= 500000 &&
+        data.audioDataUrl.matches('^data:audio/.+;base64,[A-Za-z0-9+/=]+$') &&
+        data.recordedDate is string &&
+        data.recordedDate.size() >= 4 &&
+        data.recordedDate.size() <= 40 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSavedMemory(data) {
+      return data.keys().hasAll([
+          'memoryId',
+          'userId',
+          'sourceType',
+          'sourceId',
+          'anonymousLabel',
+          'title',
+          'excerpt',
+          'flowerVariant',
+          'folder',
+          'personalNote',
+          'savedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'memoryId',
+          'userId',
+          'sourceType',
+          'sourceId',
+          'anonymousLabel',
+          'title',
+          'excerpt',
+          'flowerVariant',
+          'folder',
+          'personalNote',
+          'savedAt'
+        ]) &&
+        isValidId(data.memoryId) &&
+        isValidId(data.userId) &&
+        data.sourceType is string &&
+        data.sourceType in ['community_story', 'supportive_reply', 'diary_entry'] &&
+        isValidId(data.sourceId) &&
+        data.anonymousLabel is string &&
+        data.anonymousLabel.size() >= 1 &&
+        data.anonymousLabel.size() <= 60 &&
+        data.title is string &&
+        data.title.size() <= 140 &&
+        data.excerpt is string &&
+        data.excerpt.size() >= 1 &&
+        data.excerpt.size() <= 2000 &&
+        data.flowerVariant is string &&
+        data.flowerVariant.size() <= 40 &&
+        data.folder is string &&
+        data.folder in ['Quiet Comfort', 'Kind Words', 'Personal Milestones', 'Unsorted'] &&
+        data.personalNote is string &&
+        data.personalNote.size() <= 300 &&
+        data.savedAt is timestamp;
+    }
+
     // 4. Collection Rules: Stories
     match /stories/{storyId} {
       allow get: if isValidId(storyId) && (existing().moderationStatus == 'approved' || isAdmin());
@@ -348,19 +572,16 @@ service cloud.firestore {
         incoming().createdAt == existing().createdAt &&
         incoming().updatedAt == request.time &&
         (
-          // Action 1: Increment Warmth Count by 1
           (incoming().diff(existing()).affectedKeys().hasOnly(['warmthCount', 'updatedAt']) &&
             incoming().warmthCount == existing().warmthCount + 1 &&
             incoming().messageCount == existing().messageCount &&
             incoming().moderationStatus == existing().moderationStatus &&
             existsAfter(/databases/$(database)/documents/stories/$(storyId))) ||
-          // Action 2: Increment Supportive Message Count by 1
           (incoming().diff(existing()).affectedKeys().hasOnly(['messageCount', 'updatedAt']) &&
             incoming().messageCount == existing().messageCount + 1 &&
             incoming().warmthCount == existing().warmthCount &&
             incoming().moderationStatus == existing().moderationStatus &&
             existsAfter(/databases/$(database)/documents/stories/$(storyId))) ||
-          // Action 3: Admin Moderation Override
           (isAdmin() &&
             incoming().diff(existing()).affectedKeys().hasOnly(['moderationStatus', 'updatedAt']))
         );
@@ -441,7 +662,7 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // 6. Collection Rules: User Accounts (Login Details & PII Protected)
+    // 6. Collection Rules: User Accounts & Strictly Private My Space Subcollections
     match /userAccounts/{userId} {
       allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
       allow list: if isAdmin() || (isSignedIn() && existing().uid == request.auth.uid);
@@ -464,7 +685,6 @@ service cloud.firestore {
         incoming().createdAt == existing().createdAt &&
         incoming().updatedAt == request.time &&
         (
-          // Action 1: Returning Login Session Update by Account Owner
           (isOwner(userId) &&
             incoming().role == existing().role &&
             incoming().loginCount == existing().loginCount + 1 &&
@@ -479,12 +699,110 @@ service cloud.firestore {
               'lastLoginAt',
               'updatedAt'
             ])) ||
-          // Action 2: Admin Role Assignment Update
           (isAdmin() &&
             incoming().diff(existing()).affectedKeys().hasOnly(['role', 'updatedAt']))
         );
 
       allow delete: if isAdmin() && isValidId(userId);
+
+      // 6A. Strictly Private Personal Diary (Owner-Only + Backend Premium Gated)
+      match /personalDiary/{entryId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(entryId);
+        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(entryId) &&
+          isValidDiaryEntry(incoming()) &&
+          incoming().entryId == entryId &&
+          incoming().userId == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          hasSecretGardenAccess(userId);
+
+        allow update: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(entryId) &&
+          isValidDiaryEntry(incoming()) &&
+          incoming().entryId == existing().entryId &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'title',
+            'content',
+            'moodTag',
+            'entryDate',
+            'isMemorySaved',
+            'updatedAt'
+          ]) &&
+          hasSecretGardenAccess(userId);
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(entryId);
+      }
+
+      // 6B. Strictly Private Voice Journals (Owner-Only + Backend Premium Gated)
+      match /voiceJournals/{voiceId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(voiceId);
+        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(voiceId) &&
+          isValidVoiceJournal(incoming()) &&
+          incoming().voiceId == voiceId &&
+          incoming().userId == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          hasSecretGardenAccess(userId);
+
+        allow update: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(voiceId) &&
+          isValidVoiceJournal(incoming()) &&
+          incoming().voiceId == existing().voiceId &&
+          incoming().userId == existing().userId &&
+          incoming().audioDataUrl == existing().audioDataUrl &&
+          incoming().mimeType == existing().mimeType &&
+          incoming().durationSeconds == existing().durationSeconds &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'updatedAt']) &&
+          hasSecretGardenAccess(userId);
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(voiceId);
+      }
+
+      // 6C. Strictly Private Saved Memories (Owner-Only + Backend Premium Gated)
+      match /memories/{memoryId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(memoryId);
+        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(memoryId) &&
+          isValidSavedMemory(incoming()) &&
+          incoming().memoryId == memoryId &&
+          incoming().userId == request.auth.uid &&
+          incoming().savedAt == request.time &&
+          hasSecretGardenAccess(userId);
+
+        allow update: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(memoryId) &&
+          isValidSavedMemory(incoming()) &&
+          incoming().memoryId == existing().memoryId &&
+          incoming().userId == existing().userId &&
+          incoming().sourceType == existing().sourceType &&
+          incoming().sourceId == existing().sourceId &&
+          incoming().anonymousLabel == existing().anonymousLabel &&
+          incoming().excerpt == existing().excerpt &&
+          incoming().savedAt == existing().savedAt &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['folder', 'personalNote', 'title']) &&
+          hasSecretGardenAccess(userId);
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(memoryId);
+      }
     }
 
     // 7. Collection Rules: Immutable Login Activity History
@@ -544,7 +862,77 @@ service cloud.firestore {
       allow delete: if isAdmin() && isValidId(subscriptionId);
     }
 
-    // 9. Collection Rules: Admins
+    // 9. Collection Rules: The Secret Garden User Memberships & Customisation
+    match /secretGardenMemberships/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && existing().userId == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+        isValidId(userId) &&
+        isValidSecretGardenMembership(incoming()) &&
+        incoming().userId == userId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        (
+          (isOwner(userId) &&
+            incoming().paymentMode in ['none', 'trial_no_card', 'demo_checkout']) ||
+          isAdmin()
+        );
+
+      allow update: if isSignedIn() &&
+        isValidId(userId) &&
+        isValidSecretGardenMembership(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          (isOwner(userId) &&
+            (existing().hasUsedFreeTrial == false || incoming().hasUsedFreeTrial == true) &&
+            !(existing().hasUsedFreeTrial == true && incoming().status == 'trialing' && existing().status != 'trialing') &&
+            incoming().paymentMode in ['none', 'trial_no_card', 'demo_checkout'] &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'planId',
+              'status',
+              'hasUsedFreeTrial',
+              'trialStartedAt',
+              'trialEndsAt',
+              'billingCycle',
+              'priceInr',
+              'startedAt',
+              'nextBillingAt',
+              'autoRenew',
+              'paymentMode',
+              'gardenTheme',
+              'gardenBackground',
+              'gardenEffect',
+              'exclusiveFloraPreset',
+              'updatedAt'
+            ])) ||
+          (isAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'planId',
+              'status',
+              'hasUsedFreeTrial',
+              'trialStartedAt',
+              'trialEndsAt',
+              'billingCycle',
+              'priceInr',
+              'startedAt',
+              'nextBillingAt',
+              'autoRenew',
+              'paymentMode',
+              'gardenTheme',
+              'gardenBackground',
+              'gardenEffect',
+              'exclusiveFloraPreset',
+              'updatedAt'
+            ]))
+        );
+
+      allow delete: if (isOwner(userId) || isAdmin()) && isValidId(userId);
+    }
+
+    // 10. Collection Rules: Admins
     match /admins/{adminId} {
       allow get: if isAdmin() && isValidId(adminId);
       allow list, create, update, delete: if false;

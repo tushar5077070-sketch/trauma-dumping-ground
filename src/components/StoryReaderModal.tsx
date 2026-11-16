@@ -9,6 +9,8 @@ import {
   Eye,
   Send,
   X,
+  Bookmark,
+  BookmarkCheck,
 } from 'lucide-react';
 import { SEED_OPTIONS, Story, SupportiveMessage } from '../types/garden';
 import {
@@ -25,6 +27,14 @@ interface StoryReaderModalProps {
   onClose: () => void;
   onReadAnother: () => void;
   onLocalStoryWarmthIncrement: (storyId: string) => void;
+  canSaveMemories?: boolean;
+  savedSourceIds?: Set<string>;
+  onSaveStoryToMemory?: (story: Story) => Promise<void>;
+  onSaveMessageToMemory?: (
+    msg: SupportiveMessage,
+    story: Story
+  ) => Promise<void>;
+  onRequestUnlockMemories?: () => void;
 }
 
 function formatRelativeTime(date: Date): string {
@@ -47,6 +57,11 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
   onClose,
   onReadAnother,
   onLocalStoryWarmthIncrement,
+  canSaveMemories = false,
+  savedSourceIds,
+  onSaveStoryToMemory,
+  onSaveMessageToMemory,
+  onRequestUnlockMemories,
 }) => {
   const [warmthSent, setWarmthSent] = useState(false);
   const [localWarmthDelta, setLocalWarmthDelta] = useState(0);
@@ -55,6 +70,7 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [messageSuccess, setMessageSuccess] = useState(false);
   const [messages, setMessages] = useState<SupportiveMessage[]>([]);
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   const [isWarningRevealed, setIsWarningRevealed] = useState(false);
   const [showReportPanel, setShowReportPanel] = useState(false);
@@ -153,7 +169,46 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
             <span>{formatRelativeTime(story.createdAt)}</span>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={async () => {
+                if (!canSaveMemories) {
+                  onRequestUnlockMemories?.();
+                  return;
+                }
+                if (!onSaveStoryToMemory || savingId === story.storyId) return;
+                setSavingId(story.storyId);
+                try {
+                  await onSaveStoryToMemory(story);
+                } finally {
+                  setSavingId(null);
+                }
+              }}
+              title={
+                savedSourceIds?.has(story.storyId)
+                  ? 'Saved in My Memories'
+                  : 'Save story to My Memories'
+              }
+              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition-colors cursor-pointer ${
+                savedSourceIds?.has(story.storyId)
+                  ? 'bg-amber-50 text-amber-800 border border-amber-200 font-medium'
+                  : 'text-slate-600 hover:text-amber-800 hover:bg-amber-50/70'
+              }`}
+            >
+              {savedSourceIds?.has(story.storyId) ? (
+                <>
+                  <BookmarkCheck className="w-3.5 h-3.5 text-amber-600" />
+                  <span className="hidden sm:inline">Saved</span>
+                </>
+              ) : (
+                <>
+                  <Bookmark className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Save Memory</span>
+                </>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={() => setShowReportPanel((prev) => !prev)}
@@ -348,23 +403,63 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
                 Kind Words Left by Visitors ({messages.length})
               </h3>
               <div className="space-y-2">
-                {messages.map((msg) => (
-                  <div
-                    key={msg.messageId}
-                    className="p-3 rounded-2xl bg-slate-50/85 border border-slate-200/60"
-                  >
-                    <div className="flex items-center gap-2 text-[11px] text-slate-500 mb-0.5">
-                      <span className="font-semibold text-slate-700">
-                        {msg.anonymousId}
-                      </span>
-                      <span aria-hidden="true">·</span>
-                      <span>{formatRelativeTime(msg.createdAt)}</span>
+                {messages.map((msg) => {
+                  const isMsgSaved = savedSourceIds?.has(msg.messageId);
+                  return (
+                    <div
+                      key={msg.messageId}
+                      className="p-3 rounded-2xl bg-slate-50/85 border border-slate-200/60"
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                          <span className="font-semibold text-slate-700">
+                            {msg.anonymousId}
+                          </span>
+                          <span aria-hidden="true">·</span>
+                          <span>{formatRelativeTime(msg.createdAt)}</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!canSaveMemories) {
+                              onRequestUnlockMemories?.();
+                              return;
+                            }
+                            if (!onSaveMessageToMemory || savingId === msg.messageId)
+                              return;
+                            setSavingId(msg.messageId);
+                            try {
+                              await onSaveMessageToMemory(msg, story);
+                            } finally {
+                              setSavingId(null);
+                            }
+                          }}
+                          title={
+                            isMsgSaved
+                              ? 'Saved in My Memories'
+                              : 'Save kind words to My Memories'
+                          }
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] transition-colors cursor-pointer ${
+                            isMsgSaved
+                              ? 'bg-amber-50 text-amber-800 font-medium'
+                              : 'text-slate-400 hover:text-amber-700 hover:bg-amber-50/60'
+                          }`}
+                        >
+                          {isMsgSaved ? (
+                            <BookmarkCheck className="w-3 h-3 text-amber-600" />
+                          ) : (
+                            <Bookmark className="w-3 h-3" />
+                          )}
+                          <span>{isMsgSaved ? 'Saved' : 'Save'}</span>
+                        </button>
+                      </div>
+                      <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
+                        {msg.content}
+                      </p>
                     </div>
-                    <p className="text-xs sm:text-sm text-slate-700 leading-relaxed">
-                      {msg.content}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}

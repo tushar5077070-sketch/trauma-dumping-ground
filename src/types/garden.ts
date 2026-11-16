@@ -779,3 +779,354 @@ export const INITIAL_SUPPORTIVE_MESSAGES: Record<
     },
   ],
 };
+
+// =========================================================================
+// MY SPACE & THE SECRET GARDEN FREEMIUM TYPES (Synced with firebase-blueprint)
+// =========================================================================
+
+export type SecretGardenPlanId =
+  | 'free'
+  | 'secret_garden_monthly'
+  | 'secret_garden_annual';
+
+export type SecretGardenStatus =
+  | 'free'
+  | 'trialing'
+  | 'active'
+  | 'cancelled'
+  | 'expired';
+
+export type SecretGardenBillingCycle = 'none' | 'monthly' | 'annual';
+
+export type SecretGardenPaymentMode =
+  | 'none'
+  | 'trial_no_card'
+  | 'demo_checkout'
+  | 'admin_assigned';
+
+export type GardenThemeId =
+  | 'meadow'
+  | 'twilight'
+  | 'blossom_mist'
+  | 'golden_hour';
+
+export type GardenBackgroundId =
+  | 'classic_sky'
+  | 'pastel_dawn'
+  | 'starlit_dusk'
+  | 'dew_morning';
+
+export type GardenEffectId =
+  | 'breeze'
+  | 'fireflies'
+  | 'sakura_drift'
+  | 'sunbeams';
+
+export type ExclusiveFloraPresetId =
+  | 'classic'
+  | 'moonlight_iris'
+  | 'pastel_peony'
+  | 'golden_lotus';
+
+export interface GardenCustomisationSettings {
+  gardenTheme: GardenThemeId;
+  gardenBackground: GardenBackgroundId;
+  gardenEffect: GardenEffectId;
+  exclusiveFloraPreset: ExclusiveFloraPresetId;
+}
+
+export const DEFAULT_GARDEN_CUSTOMISATION: GardenCustomisationSettings = {
+  gardenTheme: 'meadow',
+  gardenBackground: 'classic_sky',
+  gardenEffect: 'breeze',
+  exclusiveFloraPreset: 'classic',
+};
+
+export interface SecretGardenMembership {
+  userId: string;
+  planId: SecretGardenPlanId;
+  status: SecretGardenStatus;
+  hasUsedFreeTrial: boolean;
+  trialStartedAt: string;
+  trialEndsAt: string;
+  billingCycle: SecretGardenBillingCycle;
+  priceInr: number;
+  startedAt: string;
+  nextBillingAt: string;
+  autoRenew: boolean;
+  paymentMode: SecretGardenPaymentMode;
+  gardenTheme: GardenThemeId;
+  gardenBackground: GardenBackgroundId;
+  gardenEffect: GardenEffectId;
+  exclusiveFloraPreset: ExclusiveFloraPresetId;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DiaryEntry {
+  entryId: string;
+  userId: string;
+  title: string;
+  content: string;
+  moodTag: string;
+  entryDate: string;
+  isMemorySaved: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface VoiceJournal {
+  voiceId: string;
+  userId: string;
+  title: string;
+  durationSeconds: number;
+  mimeType: string;
+  audioDataUrl: string;
+  recordedDate: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type MemorySourceType =
+  | 'community_story'
+  | 'supportive_reply'
+  | 'diary_entry';
+
+export type MemoryFolder =
+  | 'Quiet Comfort'
+  | 'Kind Words'
+  | 'Personal Milestones'
+  | 'Unsorted';
+
+export interface SavedMemory {
+  memoryId: string;
+  userId: string;
+  sourceType: MemorySourceType;
+  sourceId: string;
+  anonymousLabel: string;
+  title: string;
+  excerpt: string;
+  flowerVariant: string;
+  folder: MemoryFolder;
+  personalNote: string;
+  savedAt: Date;
+}
+
+export const MEMORY_FOLDERS: MemoryFolder[] = [
+  'Quiet Comfort',
+  'Kind Words',
+  'Personal Milestones',
+  'Unsorted',
+];
+
+export const DIARY_MOOD_TAGS: string[] = [
+  'Quiet',
+  'Reflective',
+  'Heavy',
+  'Hopeful',
+  'Grateful',
+  'Unfiltered',
+];
+
+export interface SecretGardenPlanDefinition {
+  id: SecretGardenPlanId;
+  name: string;
+  priceLabel: string;
+  priceInr: number;
+  billingCycle: SecretGardenBillingCycle;
+  tagline: string;
+  features: string[];
+  badge?: string;
+}
+
+export const SECRET_GARDEN_PLANS: SecretGardenPlanDefinition[] = [
+  {
+    id: 'free',
+    name: 'Open Meadow',
+    priceLabel: '₹0',
+    priceInr: 0,
+    billingCycle: 'none',
+    tagline: 'Forever open & anonymous',
+    features: [
+      'Anonymous story planting',
+      'Read community stories',
+      'Send warmth & supportive replies',
+      'Basic sunlit garden & free customisation',
+      'Community safety & reporting tools',
+    ],
+  },
+  {
+    id: 'secret_garden_monthly',
+    name: 'The Secret Garden Monthly',
+    priceLabel: '₹99/month',
+    priceInr: 99,
+    billingCycle: 'monthly',
+    tagline: 'First month free · No card needed for trial',
+    features: [
+      'Private Personal Diary',
+      'Private Voice Journaling',
+      'My Memories keepsake vault',
+      'Chronological Reflection History',
+      'Exclusive garden themes, flora & effects',
+    ],
+  },
+  {
+    id: 'secret_garden_annual',
+    name: 'The Secret Garden Annual',
+    priceLabel: '₹799/year',
+    priceInr: 799,
+    billingCycle: 'annual',
+    badge: 'Save 33%',
+    tagline: 'First month free · Explicit renewal choice',
+    features: [
+      'Everything in Monthly Secret Garden',
+      'Full year of private journaling & voice notes',
+      'All seasonal botanical themes & flora aura',
+      'Dedicated ₹400 annual savings vs monthly',
+    ],
+  },
+];
+
+export const GARDEN_THEME_CATALOG: {
+  id: GardenThemeId;
+  name: string;
+  description: string;
+  isPremium: boolean;
+  swatch: string;
+}[] = [
+  {
+    id: 'meadow',
+    name: 'Sunlit Meadow',
+    description: 'The original crisp blue sky and sunlit emerald field.',
+    isPremium: false,
+    swatch: 'from-sky-400 to-emerald-500',
+  },
+  {
+    id: 'blossom_mist',
+    name: 'Rosewater Mist',
+    description: 'Soft rose-tinted morning air veiled across quiet blooms.',
+    isPremium: true,
+    swatch: 'from-rose-200 via-pink-100 to-emerald-400',
+  },
+  {
+    id: 'golden_hour',
+    name: 'Golden Hour Sanctuary',
+    description: 'Warm amber sunlight resting softly over the evening grass.',
+    isPremium: true,
+    swatch: 'from-amber-200 via-orange-100 to-lime-600',
+  },
+  {
+    id: 'twilight',
+    name: 'Lavender Twilight',
+    description: 'Dreamy indigo dusk and cool violet stillness for late nights.',
+    isPremium: true,
+    swatch: 'from-indigo-500 via-purple-300 to-emerald-700',
+  },
+];
+
+export const GARDEN_BACKGROUND_CATALOG: {
+  id: GardenBackgroundId;
+  name: string;
+  description: string;
+  isPremium: boolean;
+  tintOverlay: string;
+}[] = [
+  {
+    id: 'classic_sky',
+    name: 'Clear Afternoon Sky',
+    description: 'Bright coastal breeze & drifting clouds.',
+    isPremium: false,
+    tintOverlay: 'transparent',
+  },
+  {
+    id: 'pastel_dawn',
+    name: 'Pastel Peach Dawn',
+    description: 'Blush horizon glow with soft cream clouds.',
+    isPremium: true,
+    tintOverlay: 'rgba(255, 212, 224, 0.22)',
+  },
+  {
+    id: 'dew_morning',
+    name: 'Mint Morning Dew',
+    description: 'Crisp sage-mist veil over cool sky.',
+    isPremium: true,
+    tintOverlay: 'rgba(209, 250, 229, 0.22)',
+  },
+  {
+    id: 'starlit_dusk',
+    name: 'Quiet Starlit Dusk',
+    description: 'Gentle indigo twilight with faint evening stars.',
+    isPremium: true,
+    tintOverlay: 'rgba(67, 56, 202, 0.28)',
+  },
+];
+
+export const GARDEN_EFFECT_CATALOG: {
+  id: GardenEffectId;
+  name: string;
+  description: string;
+  isPremium: boolean;
+}[] = [
+  {
+    id: 'breeze',
+    name: 'Gentle Meadow Breeze',
+    description: 'Original drifting pollen and butterflies.',
+    isPremium: false,
+  },
+  {
+    id: 'fireflies',
+    name: 'Evening Fireflies',
+    description: 'Warm floating lantern sparks gliding above flowers.',
+    isPremium: true,
+  },
+  {
+    id: 'sakura_drift',
+    name: 'Pastel Petal Drift',
+    description: 'Extra soft pink and lavender blossom petals in the wind.',
+    isPremium: true,
+  },
+  {
+    id: 'sunbeams',
+    name: 'Sanctuary Sunbeams',
+    description: 'Luminous golden rays & heightened meadow bokeh.',
+    isPremium: true,
+  },
+];
+
+export const EXCLUSIVE_FLORA_CATALOG: {
+  id: ExclusiveFloraPresetId;
+  name: string;
+  description: string;
+  isPremium: boolean;
+  auraColor: string;
+}[] = [
+  {
+    id: 'classic',
+    name: 'Wild Meadow Mix',
+    description: 'Classic tulips, daisies, sunflowers, and wild lavender.',
+    isPremium: false,
+    auraColor: 'transparent',
+  },
+  {
+    id: 'pastel_peony',
+    name: 'Blush Peony Glow',
+    description: 'Silky rose halo shimmer around resting blooms.',
+    isPremium: true,
+    auraColor: 'rgba(244, 184, 204, 0.34)',
+  },
+  {
+    id: 'moonlight_iris',
+    name: 'Moonlight Iris Aura',
+    description: 'Cool pearl-lavender luminescence on each stem.',
+    isPremium: true,
+    auraColor: 'rgba(196, 181, 253, 0.36)',
+  },
+  {
+    id: 'golden_lotus',
+    name: 'Sunlit Lotus Radiance',
+    description: 'Gentle champagne sunlight halo beneath every petal.',
+    isPremium: true,
+    auraColor: 'rgba(253, 224, 130, 0.36)',
+  },
+];
+

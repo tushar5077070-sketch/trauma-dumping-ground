@@ -488,6 +488,352 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "SecretGardenMembership": {
+      "title": "SecretGardenMembership",
+      "description": "User-facing The Secret Garden subscription, 30-day no-card free trial, and personal garden customisation state.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID owning this membership document.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "planId": {
+          "type": "string",
+          "description": "Selected Secret Garden plan tier.",
+          "enum": ["free", "secret_garden_monthly", "secret_garden_annual"]
+        },
+        "status": {
+          "type": "string",
+          "description": "Current membership lifecycle status.",
+          "enum": ["free", "trialing", "active", "cancelled", "expired"]
+        },
+        "hasUsedFreeTrial": {
+          "type": "boolean",
+          "description": "Prevents resetting the one-time first-month free trial."
+        },
+        "trialStartedAt": {
+          "type": "string",
+          "description": "ISO date when trial started.",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "trialEndsAt": {
+          "type": "string",
+          "description": "ISO date when 30-day free trial ends.",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "billingCycle": {
+          "type": "string",
+          "description": "Selected billing cycle.",
+          "enum": ["none", "monthly", "annual"]
+        },
+        "priceInr": {
+          "type": "integer",
+          "description": "Plan price in INR (0, 99, or 799)."
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "Membership start date (YYYY-MM-DD).",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "nextBillingAt": {
+          "type": "string",
+          "description": "Next billing or trial decision date (YYYY-MM-DD).",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "autoRenew": {
+          "type": "boolean",
+          "description": "Explicit informed-consent renewal preference (always false on trial)."
+        },
+        "paymentMode": {
+          "type": "string",
+          "description": "Indicates trial without card, development demo checkout, or admin assignment.",
+          "enum": ["none", "trial_no_card", "demo_checkout", "admin_assigned"]
+        },
+        "gardenTheme": {
+          "type": "string",
+          "description": "Selected personal garden atmosphere theme.",
+          "enum": ["meadow", "twilight", "blossom_mist", "golden_hour"]
+        },
+        "gardenBackground": {
+          "type": "string",
+          "description": "Selected sky and horizon backdrop option.",
+          "enum": ["classic_sky", "pastel_dawn", "starlit_dusk", "dew_morning"]
+        },
+        "gardenEffect": {
+          "type": "string",
+          "description": "Subtle visual ambient particle effect.",
+          "enum": ["breeze", "fireflies", "sakura_drift", "sunbeams"]
+        },
+        "exclusiveFloraPreset": {
+          "type": "string",
+          "description": "Exclusive visual flora palette accent.",
+          "enum": ["classic", "moonlight_iris", "pastel_peony", "golden_lotus"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when membership record was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when membership record was updated."
+        }
+      },
+      "required": [
+        "userId",
+        "planId",
+        "status",
+        "hasUsedFreeTrial",
+        "trialStartedAt",
+        "trialEndsAt",
+        "billingCycle",
+        "priceInr",
+        "startedAt",
+        "nextBillingAt",
+        "autoRenew",
+        "paymentMode",
+        "gardenTheme",
+        "gardenBackground",
+        "gardenEffect",
+        "exclusiveFloraPreset",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "DiaryEntry": {
+      "title": "DiaryEntry",
+      "description": "Strictly private personal diary entry accessible only to the owning user.",
+      "type": "object",
+      "properties": {
+        "entryId": {
+          "type": "string",
+          "description": "Unique identifier for the diary entry.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the diary owner.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional user-supplied diary entry title.",
+          "minLength": 0,
+          "maxLength": 120
+        },
+        "content": {
+          "type": "string",
+          "description": "Private diary reflection text.",
+          "minLength": 1,
+          "maxLength": 5000
+        },
+        "moodTag": {
+          "type": "string",
+          "description": "Optional user-chosen quiet label (not a clinical diagnosis).",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "entryDate": {
+          "type": "string",
+          "description": "Date string YYYY-MM-DD for chronological timeline filtering.",
+          "minLength": 4,
+          "maxLength": 40
+        },
+        "isMemorySaved": {
+          "type": "boolean",
+          "description": "Whether this diary entry is bookmarked in My Memories."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when entry was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when entry was last edited."
+        }
+      },
+      "required": [
+        "entryId",
+        "userId",
+        "title",
+        "content",
+        "moodTag",
+        "entryDate",
+        "isMemorySaved",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "VoiceJournal": {
+      "title": "VoiceJournal",
+      "description": "Private audio voice recording journal accessible only to the owning user.",
+      "type": "object",
+      "properties": {
+        "voiceId": {
+          "type": "string",
+          "description": "Unique identifier for the voice recording.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the recording owner.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional title for the voice recording.",
+          "minLength": 0,
+          "maxLength": 120
+        },
+        "durationSeconds": {
+          "type": "integer",
+          "description": "Length of the audio recording in seconds (1 to 300)."
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "Audio MIME type produced by MediaRecorder.",
+          "minLength": 5,
+          "maxLength": 80
+        },
+        "audioDataUrl": {
+          "type": "string",
+          "description": "Base64-encoded audio data URI (max ~360KB binary audio).",
+          "minLength": 10,
+          "maxLength": 500000
+        },
+        "recordedDate": {
+          "type": "string",
+          "description": "Date string YYYY-MM-DD for timeline filtering.",
+          "minLength": 4,
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when recording was saved."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when recording metadata was updated."
+        }
+      },
+      "required": [
+        "voiceId",
+        "userId",
+        "title",
+        "durationSeconds",
+        "mimeType",
+        "audioDataUrl",
+        "recordedDate",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SavedMemory": {
+      "title": "SavedMemory",
+      "description": "User's private saved collection of anonymous community posts, kind replies, or personal diary entries.",
+      "type": "object",
+      "properties": {
+        "memoryId": {
+          "type": "string",
+          "description": "Unique identifier for the saved memory.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the collector.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sourceType": {
+          "type": "string",
+          "description": "Origin type of the saved memory.",
+          "enum": ["community_story", "supportive_reply", "diary_entry"]
+        },
+        "sourceId": {
+          "type": "string",
+          "description": "Referenced story, message, or diary entry ID.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "anonymousLabel": {
+          "type": "string",
+          "description": "Preserved anonymous label (never exposes real author identity).",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "title": {
+          "type": "string",
+          "description": "Optional heading or context title for the memory.",
+          "minLength": 0,
+          "maxLength": 140
+        },
+        "excerpt": {
+          "type": "string",
+          "description": "Text excerpt of the bookmarked story, kind message, or diary entry.",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "flowerVariant": {
+          "type": "string",
+          "description": "Flower variant associated with the saved memory, if applicable.",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "folder": {
+          "type": "string",
+          "description": "User organization collection folder.",
+          "enum": ["Quiet Comfort", "Kind Words", "Personal Milestones", "Unsorted"]
+        },
+        "personalNote": {
+          "type": "string",
+          "description": "Private personal note attached to the memory.",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "savedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when memory was saved."
+        }
+      },
+      "required": [
+        "memoryId",
+        "userId",
+        "sourceType",
+        "sourceId",
+        "anonymousLabel",
+        "title",
+        "excerpt",
+        "flowerVariant",
+        "folder",
+        "personalNote",
+        "savedAt"
+      ]
     }
   },
   "firestore": {
@@ -518,6 +864,22 @@
     "/subscriptions/{subscriptionId}": {
       "schema": "Subscription",
       "description": "Subscription plans recorded and managed by the admin, readable by the user (own plan) and admin."
+    },
+    "/secretGardenMemberships/{userId}": {
+      "schema": "SecretGardenMembership",
+      "description": "Per-user The Secret Garden membership, 30-day free trial, and personal garden customisation state."
+    },
+    "/userAccounts/{userId}/personalDiary/{entryId}": {
+      "schema": "DiaryEntry",
+      "description": "Private personal diary entries strictly isolated to the owning user."
+    },
+    "/userAccounts/{userId}/voiceJournals/{voiceId}": {
+      "schema": "VoiceJournal",
+      "description": "Private voice recording journals strictly isolated to the owning user."
+    },
+    "/userAccounts/{userId}/memories/{memoryId}": {
+      "schema": "SavedMemory",
+      "description": "Private bookmarked memories strictly isolated to the owning user."
     }
   }
 }

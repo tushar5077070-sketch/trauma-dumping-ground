@@ -1,6 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Sparkles, Heart } from 'lucide-react';
-import { SEED_OPTIONS, Story } from '../types/garden';
+import {
+  DEFAULT_GARDEN_CUSTOMISATION,
+  EXCLUSIVE_FLORA_CATALOG,
+  GARDEN_BACKGROUND_CATALOG,
+  GardenCustomisationSettings,
+  SEED_OPTIONS,
+  Story,
+} from '../types/garden';
 import { soundscape } from '../utils/soundscape';
 import { MeadowFlowerSvg } from './FlowerIllustration';
 import cleanMeadowSkyImg from '../assets/images/clean_meadow_sky_1794588674441.jpg';
@@ -9,6 +16,7 @@ interface LivingGardenCanvasProps {
   stories: Story[];
   onSelectStory: (story: Story) => void;
   highlightedStoryId?: string | null;
+  gardenCustomisation?: GardenCustomisationSettings;
 }
 
 interface GrassBlade {
@@ -85,6 +93,7 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
   stories,
   onSelectStory,
   highlightedStoryId,
+  gardenCustomisation = DEFAULT_GARDEN_CUSTOMISATION,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -108,6 +117,9 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
   const highlightedStoryIdRef = useRef<string | null>(
     highlightedStoryId || null
   );
+  const customisationRef = useRef<GardenCustomisationSettings>(
+    gardenCustomisation
+  );
 
   useEffect(() => {
     hoveredStoryIdRef.current = hoveredStoryId;
@@ -116,6 +128,10 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
   useEffect(() => {
     highlightedStoryIdRef.current = highlightedStoryId || null;
   }, [highlightedStoryId]);
+
+  useEffect(() => {
+    customisationRef.current = gardenCustomisation;
+  }, [gardenCustomisation]);
 
   const pointerRef = useRef<{
     x: number;
@@ -591,6 +607,57 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
       }
       bgCtx.restore();
 
+      // 2.5 Theme & Backdrop Tint Atmosphere
+      const activeCustom = customisationRef.current;
+      if (activeCustom.gardenTheme !== 'meadow') {
+        bgCtx.save();
+        if (activeCustom.gardenTheme === 'twilight') {
+          const twGrad = bgCtx.createLinearGradient(0, 0, 0, height);
+          twGrad.addColorStop(0, 'rgba(49, 46, 129, 0.36)');
+          twGrad.addColorStop(0.55, 'rgba(139, 92, 246, 0.16)');
+          twGrad.addColorStop(1, 'rgba(15, 23, 42, 0.25)');
+          bgCtx.fillStyle = twGrad;
+          bgCtx.fillRect(0, 0, width, height);
+        } else if (activeCustom.gardenTheme === 'blossom_mist') {
+          const bmGrad = bgCtx.createLinearGradient(0, 0, 0, height);
+          bmGrad.addColorStop(0, 'rgba(251, 207, 232, 0.28)');
+          bmGrad.addColorStop(0.55, 'rgba(255, 241, 242, 0.18)');
+          bmGrad.addColorStop(1, 'rgba(254, 205, 211, 0.08)');
+          bgCtx.fillStyle = bmGrad;
+          bgCtx.fillRect(0, 0, width, height);
+        } else if (activeCustom.gardenTheme === 'golden_hour') {
+          const ghGrad = bgCtx.createLinearGradient(0, 0, 0, height);
+          ghGrad.addColorStop(0, 'rgba(251, 191, 36, 0.22)');
+          ghGrad.addColorStop(0.58, 'rgba(253, 186, 116, 0.18)');
+          ghGrad.addColorStop(1, 'rgba(180, 83, 9, 0.1)');
+          bgCtx.fillStyle = ghGrad;
+          bgCtx.fillRect(0, 0, width, height);
+        }
+        bgCtx.restore();
+      }
+
+      const bgMeta = GARDEN_BACKGROUND_CATALOG.find(
+        (b) => b.id === activeCustom.gardenBackground
+      );
+      if (bgMeta && bgMeta.tintOverlay !== 'transparent') {
+        bgCtx.save();
+        bgCtx.fillStyle = bgMeta.tintOverlay;
+        bgCtx.fillRect(0, 0, width, height);
+        if (activeCustom.gardenBackground === 'starlit_dusk') {
+          bgCtx.fillStyle = 'rgba(255, 255, 245, 0.72)';
+          for (let st = 0; st < 26; st++) {
+            const sx = ((st * 193) % 100) * 0.01 * width;
+            const sy = ((st * 79) % 42) * 0.01 * height;
+            const twinkle = 0.5 + 0.5 * Math.sin(t * 1.4 + st);
+            bgCtx.globalAlpha = 0.35 + twinkle * 0.55;
+            bgCtx.beginPath();
+            bgCtx.arc(sx, sy, st % 3 === 0 ? 1.5 : 1.0, 0, Math.PI * 2);
+            bgCtx.fill();
+          }
+        }
+        bgCtx.restore();
+      }
+
       // 3. Background & Midground Grass Blades
       for (let i = 0; i < blades.length; i++) {
         if (blades[i].layer !== 2) {
@@ -605,16 +672,17 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         }
       }
 
-      // 5. Crepuscular Volumetric Sunbeams
+      // 5. Crepuscular Volumetric Sunbeams (enhanced when Sunbeams effect selected)
       fgCtx.save();
       fgCtx.globalCompositeOperation = 'screen';
       const rayOriginX = width * 0.18;
       const rayOriginY = -height * 0.15;
+      const rayBoost = activeCustom.gardenEffect === 'sunbeams' ? 1.9 : 1.0;
       for (let r = 0; r < 5; r++) {
         const baseAngle = 0.35 + r * 0.16 + Math.sin(t * 0.35 + r) * 0.03;
         const raySpread = 0.065;
         const rayLen = Math.max(width, height) * 1.45;
-        const rayAlpha = 0.038 + 0.02 * Math.sin(t * 0.7 + r * 1.7);
+        const rayAlpha = (0.038 + 0.02 * Math.sin(t * 0.7 + r * 1.7)) * rayBoost;
 
         const rayGrad = fgCtx.createLinearGradient(
           rayOriginX,
@@ -641,6 +709,44 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         fgCtx.fill();
       }
       fgCtx.restore();
+
+      // 5.5 Exclusive Secret Garden Ambient Effect Overlay
+      if (activeCustom.gardenEffect === 'fireflies') {
+        fgCtx.save();
+        for (let ff = 0; ff < 18; ff++) {
+          const fx =
+            ((ff * 173 + t * (12 + (ff % 5) * 3)) % (width + 40)) - 20;
+          const fy =
+            height * (0.56 + ((ff * 37) % 36) * 0.01) +
+            Math.sin(t * 1.3 + ff) * 14;
+          const glow = 0.35 + 0.65 * Math.abs(Math.sin(t * 1.8 + ff * 0.9));
+          fgCtx.globalAlpha = glow;
+          fgCtx.shadowColor = '#FDE047';
+          fgCtx.shadowBlur = 14;
+          fgCtx.fillStyle = '#FEF08A';
+          fgCtx.beginPath();
+          fgCtx.arc(fx, fy, 2.3, 0, Math.PI * 2);
+          fgCtx.fill();
+        }
+        fgCtx.restore();
+      } else if (activeCustom.gardenEffect === 'sakura_drift') {
+        fgCtx.save();
+        for (let sk = 0; sk < 22; sk++) {
+          const sx =
+            ((sk * 149 + t * (28 + (sk % 4) * 6)) % (width + 60)) - 30;
+          const sy = ((sk * 97 + t * 22) % (height + 40)) - 20;
+          fgCtx.save();
+          fgCtx.translate(sx, sy);
+          fgCtx.rotate(t * 0.9 + sk);
+          fgCtx.globalAlpha = 0.72;
+          fgCtx.fillStyle = sk % 2 === 0 ? '#FBCFE8' : '#E9D5FF';
+          fgCtx.beginPath();
+          fgCtx.ellipse(0, 0, 5.5, 2.8, 0, 0, Math.PI * 2);
+          fgCtx.fill();
+          fgCtx.restore();
+        }
+        fgCtx.restore();
+      }
 
       // 6. Fluttering Meadow Butterflies
       for (let i = 0; i < butterflies.length; i++) {
@@ -932,6 +1038,18 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
             >
               {(isHighlighted || story.isNewlyPlanted) && (
                 <div className="pointer-events-none absolute -inset-4 rounded-full bg-amber-200/55 blur-xl animate-pulse-aura" />
+              )}
+
+              {gardenCustomisation.exclusiveFloraPreset !== 'classic' && (
+                <div
+                  className="pointer-events-none absolute -inset-2 rounded-full blur-md"
+                  style={{
+                    backgroundColor:
+                      EXCLUSIVE_FLORA_CATALOG.find(
+                        (f) => f.id === gardenCustomisation.exclusiveFloraPreset
+                      )?.auraColor || 'transparent',
+                  }}
+                />
               )}
 
               <button

@@ -4,14 +4,30 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Volume2, VolumeX, Flower2, Sparkles, Compass } from 'lucide-react';
+import { User } from 'firebase/auth';
+import {
+  Volume2,
+  VolumeX,
+  Flower2,
+  Sparkles,
+  Compass,
+  LogIn,
+  ShieldCheck,
+} from 'lucide-react';
 import { INITIAL_GARDEN_STORIES, SeedType, Story } from './types/garden';
 import { subscribeToApprovedStories } from './services/gardenService';
+import {
+  ensureUserAccountSynced,
+  isVerifiedAdminUser,
+  subscribeToAuthState,
+} from './services/authAccountService';
 import { soundscape } from './utils/soundscape';
 import { LivingGardenCanvas } from './components/LivingGardenCanvas';
 import { WriteStoryModal } from './components/WriteStoryModal';
 import { StoryReaderModal } from './components/StoryReaderModal';
 import { InfoModals } from './components/InfoModals';
+import { AccountModal } from './components/AccountModal';
+import { AdminBackendModal } from './components/AdminBackendModal';
 
 export default function App() {
   const [stories, setStories] = useState<Story[]>(() =>
@@ -32,6 +48,10 @@ export default function App() {
   );
   const [isSoundEnabled, setIsSoundEnabled] = useState(false);
 
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+
   const visitedStoryIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -39,6 +59,16 @@ export default function App() {
       setStories(loadedStories);
     });
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribeAuth = subscribeToAuthState((user) => {
+      setCurrentUser(user);
+      if (user) {
+        ensureUserAccountSynced(user).catch(() => {});
+      }
+    });
+    return () => unsubscribeAuth();
   }, []);
 
   const handleSelectStory = useCallback((story: Story) => {
@@ -88,6 +118,12 @@ export default function App() {
     setIsSoundEnabled(nextState);
   };
 
+  const isAdmin = isVerifiedAdminUser(currentUser);
+  const firstName =
+    currentUser?.displayName?.trim().split(/\s+/)[0] ||
+    currentUser?.email?.split('@')[0] ||
+    'Account';
+
   return (
     <div className="relative w-full h-[100dvh] overflow-hidden select-none">
       {/* 1. Living 3D-like Flower Meadow & Sky Environment */}
@@ -111,7 +147,7 @@ export default function App() {
                   setIsWriteModalOpen(false);
                   setActiveInfoModal(null);
                 }}
-                className="inline-flex items-center gap-1.5 sm:gap-2 font-editorial text-lg sm:text-lg md:text-xl lg:text-2xl font-semibold tracking-tight text-white drop-shadow-sm whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1.5 sm:gap-2 font-editorial text-lg sm:text-base md:text-lg lg:text-2xl font-semibold tracking-tight text-white drop-shadow-sm whitespace-nowrap shrink-0"
               >
                 <Flower2 className="w-4 h-4 sm:w-4.5 sm:h-4.5 lg:w-5 lg:h-5 text-pink-100 shrink-0" />
                 <span>Trauma Dumping Ground</span>
@@ -128,11 +164,11 @@ export default function App() {
               </button>
             </div>
 
-            {/* Row 2 on mobile / Right side on Tablet & Laptop: Navigation, Sound & Tablet/Desktop CTA */}
-            <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 md:gap-4 lg:gap-6 shrink-0">
+            {/* Row 2 on mobile / Right side on Tablet & Laptop: Navigation, Sound, Auth & Tablet/Desktop CTA */}
+            <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-2.5 md:gap-4 lg:gap-5 shrink-0">
               <nav
                 aria-label="Primary navigation"
-                className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-3 sm:gap-3 md:gap-4 lg:gap-6 text-xs md:text-sm font-medium text-white/95"
+                className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-2 sm:gap-2.5 md:gap-4 lg:gap-5 text-xs md:text-sm font-medium text-white/95"
               >
                 <button
                   type="button"
@@ -161,22 +197,71 @@ export default function App() {
                   {isSoundEnabled ? (
                     <>
                       <Volume2 className="w-3.5 h-3.5 shrink-0" />
-                      <span className="text-xs">Sound On</span>
+                      <span className="hidden min-[400px]:inline sm:hidden lg:inline text-xs">
+                        Sound On
+                      </span>
                     </>
                   ) : (
                     <>
                       <VolumeX className="w-3.5 h-3.5 opacity-90 shrink-0" />
-                      <span className="text-xs">Sound Off</span>
+                      <span className="hidden min-[400px]:inline sm:hidden lg:inline text-xs">
+                        Sound Off
+                      </span>
                     </>
                   )}
                 </button>
+
+                {/* Sign In / Account Button */}
+                {currentUser ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsAccountModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-0.5 rounded-full bg-white/25 hover:bg-white/35 border border-white/40 text-xs font-medium text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
+                    title="View account and subscription plan"
+                  >
+                    {currentUser.photoURL ? (
+                      <img
+                        src={currentUser.photoURL}
+                        alt={firstName}
+                        referrerPolicy="no-referrer"
+                        className="w-5 h-5 rounded-full object-cover border border-white/70 shrink-0"
+                      />
+                    ) : (
+                      <span className="w-5 h-5 rounded-full bg-slate-900/80 text-[10px] font-semibold flex items-center justify-center shrink-0">
+                        {firstName.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="max-w-[72px] truncate">{firstName}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsAccountModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/22 hover:bg-white/35 border border-white/40 text-xs font-medium text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
+                  >
+                    <LogIn className="w-3.5 h-3.5 shrink-0" />
+                    <span>Sign In</span>
+                  </button>
+                )}
+
+                {/* Admin Backend Console Trigger */}
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAdminModalOpen(true)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-400/90 hover:bg-amber-300 text-slate-950 border border-amber-200 text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer shadow-xs"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                    <span>Backend</span>
+                  </button>
+                )}
               </nav>
 
               {/* Tablet & Desktop Plant CTA */}
               <button
                 type="button"
                 onClick={() => setIsWriteModalOpen(true)}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 md:px-4 py-1.5 md:py-2 rounded-full bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md border border-white/25 text-xs md:text-sm font-medium text-white shadow-sm transition-all whitespace-nowrap cursor-pointer shrink-0"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md border border-white/25 text-xs md:text-sm font-medium text-white shadow-sm transition-all whitespace-nowrap cursor-pointer shrink-0"
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-200 shrink-0" />
                 <span>Plant a Seed 🌱</span>
@@ -249,6 +334,21 @@ export default function App() {
         onClose={() => setActiveInfoModal(null)}
         onStartPlanting={() => setIsWriteModalOpen(true)}
         totalFlowersCount={stories.length}
+      />
+
+      {/* 7. Google Sign-In & Member Account Modal */}
+      <AccountModal
+        isOpen={isAccountModalOpen}
+        currentUser={currentUser}
+        onClose={() => setIsAccountModalOpen(false)}
+        onOpenAdminConsole={() => setIsAdminModalOpen(true)}
+      />
+
+      {/* 8. Admin Backend Logins & Subscriptions Console */}
+      <AdminBackendModal
+        isOpen={isAdminModalOpen}
+        currentUser={currentUser}
+        onClose={() => setIsAdminModalOpen(false)}
       />
     </div>
   );

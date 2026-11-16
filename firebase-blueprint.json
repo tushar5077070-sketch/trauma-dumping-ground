@@ -225,6 +225,269 @@
         }
       },
       "required": ["reportId", "targetType", "targetId", "storyId", "reason", "details", "status", "createdAt"]
+    },
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Authenticated user account and login metadata recorded when a visitor signs in.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID for the user.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "description": "Verified account email address.",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name from identity provider.",
+          "minLength": 0,
+          "maxLength": 100
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Profile avatar URL.",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "providerId": {
+          "type": "string",
+          "description": "Authentication provider identifier.",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "role": {
+          "type": "string",
+          "description": "Account access role.",
+          "enum": ["member", "admin"]
+        },
+        "userAgentSummary": {
+          "type": "string",
+          "description": "Compact browser/device summary captured at login.",
+          "minLength": 0,
+          "maxLength": 160
+        },
+        "loginCount": {
+          "type": "integer",
+          "description": "Total number of recorded sign-ins."
+        },
+        "lastLoginAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the most recent sign-in."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the account first logged in."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of the last account update."
+        }
+      },
+      "required": [
+        "uid",
+        "email",
+        "displayName",
+        "photoURL",
+        "providerId",
+        "role",
+        "userAgentSummary",
+        "loginCount",
+        "lastLoginAt",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "LoginEvent": {
+      "title": "LoginEvent",
+      "description": "Immutable login audit entry created whenever a user signs in.",
+      "type": "object",
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "description": "Unique identifier for the login event.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user who logged in.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "description": "Email address used during login.",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name at time of login.",
+          "minLength": 0,
+          "maxLength": 100
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Profile photo URL at time of login.",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "providerId": {
+          "type": "string",
+          "description": "Authentication provider identifier.",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "userAgentSummary": {
+          "type": "string",
+          "description": "Browser/device summary at time of login.",
+          "minLength": 0,
+          "maxLength": 160
+        },
+        "loggedInAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the login occurred."
+        }
+      },
+      "required": [
+        "eventId",
+        "uid",
+        "email",
+        "displayName",
+        "photoURL",
+        "providerId",
+        "userAgentSummary",
+        "loggedInAt"
+      ]
+    },
+    "Subscription": {
+      "title": "Subscription",
+      "description": "Subscription plan record assigned and managed by the admin for a logged-in user.",
+      "type": "object",
+      "properties": {
+        "subscriptionId": {
+          "type": "string",
+          "description": "Unique identifier for the subscription record.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the user in /userAccounts.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userEmail": {
+          "type": "string",
+          "description": "User email snapshot for quick reference.",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "userName": {
+          "type": "string",
+          "description": "User display name snapshot.",
+          "minLength": 0,
+          "maxLength": 100
+        },
+        "planName": {
+          "type": "string",
+          "description": "Subscription plan tier.",
+          "enum": ["free", "seedling", "bloom", "sanctuary"]
+        },
+        "billingCycle": {
+          "type": "string",
+          "description": "Billing cadence for the subscription.",
+          "enum": ["monthly", "yearly", "lifetime", "custom"]
+        },
+        "amountPaid": {
+          "type": "number",
+          "description": "Recorded subscription amount (0 to 100000)."
+        },
+        "currency": {
+          "type": "string",
+          "description": "Currency code.",
+          "enum": ["INR", "USD", "EUR", "GBP"]
+        },
+        "status": {
+          "type": "string",
+          "description": "Lifecycle status of the subscription plan.",
+          "enum": ["active", "trialing", "paused", "expired", "cancelled"]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Admin notes or payment reference.",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "Start date string (YYYY-MM-DD).",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "expiresAt": {
+          "type": "string",
+          "description": "Expiration date string (YYYY-MM-DD) or empty.",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "recordedByUid": {
+          "type": "string",
+          "description": "Admin UID who recorded or updated the plan.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "recordedByEmail": {
+          "type": "string",
+          "description": "Admin email who recorded or updated the plan.",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the subscription record was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the subscription record was last updated."
+        }
+      },
+      "required": [
+        "subscriptionId",
+        "userId",
+        "userEmail",
+        "userName",
+        "planName",
+        "billingCycle",
+        "amountPaid",
+        "currency",
+        "status",
+        "notes",
+        "startedAt",
+        "expiresAt",
+        "recordedByUid",
+        "recordedByEmail",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -243,6 +506,18 @@
     "/reports/{reportId}": {
       "schema": "Report",
       "description": "Collection of moderation reports submitted by visitors."
+    },
+    "/userAccounts/{userId}": {
+      "schema": "UserAccount",
+      "description": "Authenticated user account profiles and login summary accessible to the account owner and admin."
+    },
+    "/loginEvents/{eventId}": {
+      "schema": "LoginEvent",
+      "description": "Immutable login event history readable by the user (own events) and admin."
+    },
+    "/subscriptions/{subscriptionId}": {
+      "schema": "Subscription",
+      "description": "Subscription plans recorded and managed by the admin, readable by the user (own plan) and admin."
     }
   }
 }

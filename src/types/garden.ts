@@ -57,6 +57,110 @@ export interface Reaction {
   createdAt: Date;
 }
 
+export type UserRole = 'member' | 'admin';
+
+export interface UserAccount {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL: string;
+  providerId: string;
+  role: UserRole;
+  userAgentSummary: string;
+  loginCount: number;
+  lastLoginAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface LoginEvent {
+  eventId: string;
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL: string;
+  providerId: string;
+  userAgentSummary: string;
+  loggedInAt: Date;
+}
+
+export type SubscriptionPlanTier = 'free' | 'seedling' | 'bloom' | 'sanctuary';
+export type SubscriptionBillingCycle = 'monthly' | 'yearly' | 'lifetime' | 'custom';
+export type SubscriptionCurrency = 'INR' | 'USD' | 'EUR' | 'GBP';
+export type SubscriptionStatus =
+  | 'active'
+  | 'trialing'
+  | 'paused'
+  | 'expired'
+  | 'cancelled';
+
+export interface SubscriptionRecord {
+  subscriptionId: string;
+  userId: string;
+  userEmail: string;
+  userName: string;
+  planName: SubscriptionPlanTier;
+  billingCycle: SubscriptionBillingCycle;
+  amountPaid: number;
+  currency: SubscriptionCurrency;
+  status: SubscriptionStatus;
+  notes: string;
+  startedAt: string;
+  expiresAt: string;
+  recordedByUid: string;
+  recordedByEmail: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ModerationReportRecord {
+  reportId: string;
+  targetType: 'story' | 'message';
+  targetId: string;
+  storyId: string;
+  reason: string;
+  details: string;
+  status: 'pending' | 'reviewed';
+  createdAt: Date;
+}
+
+export const SUBSCRIPTION_PLAN_CATALOG: {
+  id: SubscriptionPlanTier;
+  label: string;
+  suggestedAmountInr: number;
+  summary: string;
+  badgeClass: string;
+}[] = [
+  {
+    id: 'free',
+    label: 'Free Meadow',
+    suggestedAmountInr: 0,
+    summary: 'Open anonymous garden access',
+    badgeClass: 'bg-slate-100 text-slate-700 border-slate-200',
+  },
+  {
+    id: 'seedling',
+    label: 'Seedling Supporter',
+    suggestedAmountInr: 199,
+    summary: 'Monthly community supporter tier',
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  },
+  {
+    id: 'bloom',
+    label: 'Bloom Plus',
+    suggestedAmountInr: 499,
+    summary: 'Extended sanctuary care & reflection tier',
+    badgeClass: 'bg-sky-50 text-sky-700 border-sky-200',
+  },
+  {
+    id: 'sanctuary',
+    label: 'Sanctuary Patron',
+    suggestedAmountInr: 1499,
+    summary: 'Full patron sponsorship & priority support',
+    badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+  },
+];
+
 export const SEED_OPTIONS: SeedOption[] = [
   {
     id: 'daisy',

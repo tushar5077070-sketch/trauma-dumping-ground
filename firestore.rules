@@ -24,6 +24,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
     function isAdmin() {
       return isSignedIn() &&
         request.auth.token.email_verified == true &&
@@ -144,6 +148,173 @@ service cloud.firestore {
         data.status is string &&
         data.status in ['pending', 'reviewed'] &&
         data.createdAt is timestamp;
+    }
+
+    function isValidUserAccount(data) {
+      return data.keys().hasAll([
+          'uid',
+          'email',
+          'displayName',
+          'photoURL',
+          'providerId',
+          'role',
+          'userAgentSummary',
+          'loginCount',
+          'lastLoginAt',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'uid',
+          'email',
+          'displayName',
+          'photoURL',
+          'providerId',
+          'role',
+          'userAgentSummary',
+          'loginCount',
+          'lastLoginAt',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.uid) &&
+        data.email is string &&
+        data.email.size() >= 3 &&
+        data.email.size() <= 120 &&
+        data.displayName is string &&
+        data.displayName.size() >= 0 &&
+        data.displayName.size() <= 100 &&
+        data.photoURL is string &&
+        data.photoURL.size() >= 0 &&
+        data.photoURL.size() <= 500 &&
+        data.providerId is string &&
+        data.providerId.size() >= 1 &&
+        data.providerId.size() <= 40 &&
+        data.role is string &&
+        data.role in ['member', 'admin'] &&
+        data.userAgentSummary is string &&
+        data.userAgentSummary.size() >= 0 &&
+        data.userAgentSummary.size() <= 160 &&
+        data.loginCount is int &&
+        data.loginCount >= 1 &&
+        data.loginCount <= 1000000 &&
+        data.lastLoginAt is timestamp &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidLoginEvent(data) {
+      return data.keys().hasAll([
+          'eventId',
+          'uid',
+          'email',
+          'displayName',
+          'photoURL',
+          'providerId',
+          'userAgentSummary',
+          'loggedInAt'
+        ]) &&
+        data.keys().hasOnly([
+          'eventId',
+          'uid',
+          'email',
+          'displayName',
+          'photoURL',
+          'providerId',
+          'userAgentSummary',
+          'loggedInAt'
+        ]) &&
+        isValidId(data.eventId) &&
+        isValidId(data.uid) &&
+        data.email is string &&
+        data.email.size() >= 3 &&
+        data.email.size() <= 120 &&
+        data.displayName is string &&
+        data.displayName.size() >= 0 &&
+        data.displayName.size() <= 100 &&
+        data.photoURL is string &&
+        data.photoURL.size() >= 0 &&
+        data.photoURL.size() <= 500 &&
+        data.providerId is string &&
+        data.providerId.size() >= 1 &&
+        data.providerId.size() <= 40 &&
+        data.userAgentSummary is string &&
+        data.userAgentSummary.size() >= 0 &&
+        data.userAgentSummary.size() <= 160 &&
+        data.loggedInAt is timestamp;
+    }
+
+    function isValidSubscription(data) {
+      return data.keys().hasAll([
+          'subscriptionId',
+          'userId',
+          'userEmail',
+          'userName',
+          'planName',
+          'billingCycle',
+          'amountPaid',
+          'currency',
+          'status',
+          'notes',
+          'startedAt',
+          'expiresAt',
+          'recordedByUid',
+          'recordedByEmail',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'subscriptionId',
+          'userId',
+          'userEmail',
+          'userName',
+          'planName',
+          'billingCycle',
+          'amountPaid',
+          'currency',
+          'status',
+          'notes',
+          'startedAt',
+          'expiresAt',
+          'recordedByUid',
+          'recordedByEmail',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.subscriptionId) &&
+        isValidId(data.userId) &&
+        data.userEmail is string &&
+        data.userEmail.size() >= 3 &&
+        data.userEmail.size() <= 120 &&
+        data.userName is string &&
+        data.userName.size() >= 0 &&
+        data.userName.size() <= 100 &&
+        data.planName is string &&
+        data.planName in ['free', 'seedling', 'bloom', 'sanctuary'] &&
+        data.billingCycle is string &&
+        data.billingCycle in ['monthly', 'yearly', 'lifetime', 'custom'] &&
+        (data.amountPaid is int || data.amountPaid is float) &&
+        data.amountPaid >= 0 &&
+        data.amountPaid <= 100000 &&
+        data.currency is string &&
+        data.currency in ['INR', 'USD', 'EUR', 'GBP'] &&
+        data.status is string &&
+        data.status in ['active', 'trialing', 'paused', 'expired', 'cancelled'] &&
+        data.notes is string &&
+        data.notes.size() >= 0 &&
+        data.notes.size() <= 500 &&
+        data.startedAt is string &&
+        data.startedAt.size() >= 0 &&
+        data.startedAt.size() <= 40 &&
+        data.expiresAt is string &&
+        data.expiresAt.size() >= 0 &&
+        data.expiresAt.size() <= 40 &&
+        isValidId(data.recordedByUid) &&
+        data.recordedByEmail is string &&
+        data.recordedByEmail.size() >= 3 &&
+        data.recordedByEmail.size() <= 120 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
     }
 
     // 4. Collection Rules: Stories
@@ -270,7 +441,110 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // 6. Collection Rules: Admins
+    // 6. Collection Rules: User Accounts (Login Details & PII Protected)
+    match /userAccounts/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && existing().uid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+        isOwner(userId) &&
+        isValidId(userId) &&
+        isValidUserAccount(incoming()) &&
+        incoming().uid == userId &&
+        incoming().role == 'member' &&
+        incoming().loginCount == 1 &&
+        incoming().lastLoginAt == request.time &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isSignedIn() &&
+        isValidId(userId) &&
+        isValidUserAccount(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          // Action 1: Returning Login Session Update by Account Owner
+          (isOwner(userId) &&
+            incoming().role == existing().role &&
+            incoming().loginCount == existing().loginCount + 1 &&
+            incoming().lastLoginAt == request.time &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'email',
+              'displayName',
+              'photoURL',
+              'providerId',
+              'userAgentSummary',
+              'loginCount',
+              'lastLoginAt',
+              'updatedAt'
+            ])) ||
+          // Action 2: Admin Role Assignment Update
+          (isAdmin() &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['role', 'updatedAt']))
+        );
+
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    // 7. Collection Rules: Immutable Login Activity History
+    match /loginEvents/{eventId} {
+      allow get: if isValidId(eventId) && (isAdmin() || (isSignedIn() && existing().uid == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && existing().uid == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+        isValidId(eventId) &&
+        isValidLoginEvent(incoming()) &&
+        incoming().eventId == eventId &&
+        incoming().uid == request.auth.uid &&
+        incoming().loggedInAt == request.time &&
+        existsAfter(/databases/$(database)/documents/userAccounts/$(incoming().uid));
+
+      allow update, delete: if false;
+    }
+
+    // 8. Collection Rules: Admin-Managed Subscription Plans
+    match /subscriptions/{subscriptionId} {
+      allow get: if isValidId(subscriptionId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && existing().userId == request.auth.uid);
+
+      allow create: if isAdmin() &&
+        isValidId(subscriptionId) &&
+        isValidSubscription(incoming()) &&
+        incoming().subscriptionId == subscriptionId &&
+        incoming().recordedByUid == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/userAccounts/$(incoming().userId));
+
+      allow update: if isAdmin() &&
+        isValidId(subscriptionId) &&
+        isValidSubscription(incoming()) &&
+        (existing().status != 'cancelled' || isAdmin()) &&
+        incoming().subscriptionId == existing().subscriptionId &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'userEmail',
+          'userName',
+          'planName',
+          'billingCycle',
+          'amountPaid',
+          'currency',
+          'status',
+          'notes',
+          'startedAt',
+          'expiresAt',
+          'recordedByUid',
+          'recordedByEmail',
+          'updatedAt'
+        ]);
+
+      allow delete: if isAdmin() && isValidId(subscriptionId);
+    }
+
+    // 9. Collection Rules: Admins
     match /admins/{adminId} {
       allow get: if isAdmin() && isValidId(adminId);
       allow list, create, update, delete: if false;

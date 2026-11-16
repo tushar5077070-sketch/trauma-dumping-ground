@@ -784,6 +784,9 @@ export const INITIAL_SUPPORTIVE_MESSAGES: Record<
 // MY SPACE & THE SECRET GARDEN FREEMIUM TYPES (Synced with firebase-blueprint)
 // =========================================================================
 
+// Temporary global override: keeps all My Space & Secret Garden features free to everyone
+export const ALL_PREMIUM_FEATURES_FREE_FOR_NOW = true;
+
 export type SecretGardenPlanId =
   | 'free'
   | 'secret_garden_monthly'

@@ -37,8 +37,10 @@ import {
   cancelOrExpireMembership,
   hasEffectiveSecretGardenAccess,
   isTrialExpired,
+  loadLocalGardenCustomisation,
   saveCommunityStoryMemory,
   saveGardenCustomisationForUser,
+  saveLocalGardenCustomisation,
   saveSupportiveReplyMemory,
   subscribeToPersonalDiary,
   subscribeToSavedMemories,
@@ -88,6 +90,8 @@ export default function App() {
   const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
   const [voiceJournals, setVoiceJournals] = useState<VoiceJournal[]>([]);
   const [memories, setMemories] = useState<SavedMemory[]>([]);
+  const [localCustomisation, setLocalCustomisation] =
+    useState<GardenCustomisationSettings>(() => loadLocalGardenCustomisation());
 
   const visitedStoryIdsRef = useRef<Set<string>>(new Set());
 
@@ -206,16 +210,19 @@ export default function App() {
   };
 
   const activeGardenCustomisation: GardenCustomisationSettings = useMemo(() => {
-    if (!hasPremiumAccess || !secretMembership) {
+    if (!hasPremiumAccess) {
       return DEFAULT_GARDEN_CUSTOMISATION;
     }
-    return {
-      gardenTheme: secretMembership.gardenTheme || 'meadow',
-      gardenBackground: secretMembership.gardenBackground || 'classic_sky',
-      gardenEffect: secretMembership.gardenEffect || 'breeze',
-      exclusiveFloraPreset: secretMembership.exclusiveFloraPreset || 'classic',
-    };
-  }, [hasPremiumAccess, secretMembership]);
+    if (currentUser && secretMembership) {
+      return {
+        gardenTheme: secretMembership.gardenTheme || 'meadow',
+        gardenBackground: secretMembership.gardenBackground || 'classic_sky',
+        gardenEffect: secretMembership.gardenEffect || 'breeze',
+        exclusiveFloraPreset: secretMembership.exclusiveFloraPreset || 'classic',
+      };
+    }
+    return localCustomisation;
+  }, [hasPremiumAccess, currentUser, secretMembership, localCustomisation]);
 
   const savedMemorySourceIds = useMemo(
     () => new Set(memories.map((m) => m.sourceId)),
@@ -225,6 +232,8 @@ export default function App() {
   const handleUpdateCustomisation = async (
     next: GardenCustomisationSettings
   ) => {
+    saveLocalGardenCustomisation(next);
+    setLocalCustomisation(next);
     if (currentUser) {
       await saveGardenCustomisationForUser(
         currentUser.uid,
@@ -241,7 +250,11 @@ export default function App() {
   };
 
   const handleSaveStoryToMemory = async (story: Story) => {
-    if (!currentUser || !hasPremiumAccess) {
+    if (!currentUser) {
+      setIsAccountModalOpen(true);
+      return;
+    }
+    if (!hasPremiumAccess) {
       handleOpenUpgrade('My Memories');
       return;
     }
@@ -252,7 +265,11 @@ export default function App() {
     msg: SupportiveMessage,
     story: Story
   ) => {
-    if (!currentUser || !hasPremiumAccess) {
+    if (!currentUser) {
+      setIsAccountModalOpen(true);
+      return;
+    }
+    if (!hasPremiumAccess) {
       handleOpenUpgrade('My Memories');
       return;
     }
@@ -475,7 +492,13 @@ export default function App() {
         savedSourceIds={savedMemorySourceIds}
         onSaveStoryToMemory={handleSaveStoryToMemory}
         onSaveMessageToMemory={handleSaveMessageToMemory}
-        onRequestUnlockMemories={() => handleOpenUpgrade('My Memories')}
+        onRequestUnlockMemories={() => {
+          if (!currentUser) {
+            setIsAccountModalOpen(true);
+          } else {
+            handleOpenUpgrade('My Memories');
+          }
+        }}
       />
 
       {/* 5. Write Your Story & Planting Animation Modal */}

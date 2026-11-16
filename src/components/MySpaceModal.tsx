@@ -15,8 +15,10 @@ import {
   ArrowLeft,
   ShieldCheck,
   ChevronRight,
+  LogIn,
 } from 'lucide-react';
 import {
+  ALL_PREMIUM_FEATURES_FREE_FOR_NOW,
   DiaryEntry,
   GardenCustomisationSettings,
   SavedMemory,
@@ -30,6 +32,7 @@ import { ReflectionHistoryView } from './myspace/ReflectionHistoryView';
 import { GardenCustomisationView } from './myspace/GardenCustomisationView';
 import { SubscriptionSettingsView } from './myspace/SubscriptionSettingsView';
 import { isTrialExpired } from '../services/secretGardenService';
+import { signInWithGoogleAndRecord } from '../services/authAccountService';
 
 export type MySpaceFeatureKey =
   | 'overview'
@@ -161,11 +164,25 @@ export const MySpaceModal: React.FC<MySpaceModalProps> = ({
   const [activeView, setActiveView] = useState<MySpaceFeatureKey>('overview');
   const [previewFeature, setPreviewFeature] =
     useState<FeatureDefinition | null>(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   if (!isOpen) return null;
 
+  const handleQuickSignIn = async () => {
+    setIsSigningIn(true);
+    try {
+      await signInWithGoogleAndRecord();
+    } catch {
+      // Sign-in popup closed or cancelled
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
   const expired = isTrialExpired(membership);
-  const membershipBadgeLabel = isAdmin && !membership?.status
+  const membershipBadgeLabel = ALL_PREMIUM_FEATURES_FREE_FOR_NOW
+    ? 'All Features Free'
+    : isAdmin && !membership?.status
     ? 'Admin · Full Access'
     : membership?.status === 'trialing' && !expired
     ? `Secret Garden · Free Trial (Ends ${membership.trialEndsAt || 'in 30d'})`
@@ -190,14 +207,14 @@ export const MySpaceModal: React.FC<MySpaceModalProps> = ({
 
   const countForFeature = (key: FeatureDefinition['key']): string => {
     if (!hasPremiumAccess) return 'Locked preview';
+    if (key === 'customise') return 'Customize live view';
+    if (!currentUser) return 'Sign in to save';
     if (key === 'diary') return `${diaryEntries.length} entries`;
     if (key === 'voice') return `${voiceJournals.length} recordings`;
     if (key === 'memories') return `${memories.length} keepsakes`;
-    if (key === 'history')
-      return `${
-        diaryEntries.length + voiceJournals.length + memories.length
-      } moments`;
-    return 'Customize live view';
+    return `${
+      diaryEntries.length + voiceJournals.length + memories.length
+    } moments`;
   };
 
   return (
@@ -316,7 +333,11 @@ export const MySpaceModal: React.FC<MySpaceModalProps> = ({
                 ) : (
                   <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-50 border border-emerald-200/80 text-xs font-medium text-emerald-900 shrink-0">
                     <ShieldCheck className="w-4 h-4 text-emerald-700" />
-                    <span>All 5 Secret Garden Spaces Unlocked</span>
+                    <span>
+                      {ALL_PREMIUM_FEATURES_FREE_FOR_NOW
+                        ? 'All 5 Spaces Free & Open to Everyone'
+                        : 'All 5 Secret Garden Spaces Unlocked'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -347,7 +368,7 @@ export const MySpaceModal: React.FC<MySpaceModalProps> = ({
                             </span>
                           ) : (
                             <span className="text-[11px] font-medium text-emerald-700">
-                              Open
+                              {ALL_PREMIUM_FEATURES_FREE_FOR_NOW ? 'Free' : 'Open'}
                             </span>
                           )}
                         </div>
@@ -373,8 +394,8 @@ export const MySpaceModal: React.FC<MySpaceModalProps> = ({
             </>
           )}
 
-          {/* Active Feature Subview (Only Accessible When Unlocked) */}
-          {activeView !== 'overview' && activeView !== 'settings' && currentUser && (
+          {/* Active Feature Subview (All Free & Open) */}
+          {activeView !== 'overview' && activeView !== 'settings' && (
             <div className="space-y-4">
               {activeFeatureDef && (
                 <div className="space-y-1">
@@ -390,42 +411,67 @@ export const MySpaceModal: React.FC<MySpaceModalProps> = ({
                 </div>
               )}
 
-              {activeView === 'diary' && (
-                <PersonalDiaryView
-                  userId={currentUser.uid}
-                  entries={diaryEntries}
-                />
-              )}
-
-              {activeView === 'voice' && (
-                <VoiceJournalView
-                  userId={currentUser.uid}
-                  recordings={voiceJournals}
-                />
-              )}
-
-              {activeView === 'memories' && (
-                <MemoriesView
-                  userId={currentUser.uid}
-                  memories={memories}
-                />
-              )}
-
-              {activeView === 'history' && (
-                <ReflectionHistoryView
-                  diaryEntries={diaryEntries}
-                  voiceJournals={voiceJournals}
-                  memories={memories}
-                />
-              )}
-
-              {activeView === 'customise' && (
+              {activeView === 'customise' ? (
                 <GardenCustomisationView
                   customisation={gardenCustomisation}
                   hasPremiumAccess={hasPremiumAccess}
                   onUpdateCustomisation={onUpdateCustomisation}
                   onRequestUpgrade={onOpenUpgrade}
                 />
+              ) : !currentUser ? (
+                <div className="p-6 sm:p-8 rounded-2xl bg-white border border-rose-100 shadow-2xs text-center space-y-3">
+                  <ShieldCheck className="w-8 h-8 text-emerald-600 mx-auto" />
+                  <h3 className="font-editorial text-2xl font-semibold text-slate-900">
+                    Keep your {activeFeatureDef?.title || 'private space'} safe
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+                    All My Space features are completely free. Sign in with
+                    Google once so your private diary entries, voice notes, and
+                    memories stay securely linked only to your account.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleQuickSignIn}
+                    disabled={isSigningIn}
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+                  >
+                    <LogIn className="w-4 h-4 text-amber-200" />
+                    <span>
+                      {isSigningIn ? 'Signing in...' : 'Continue with Google'}
+                    </span>
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {activeView === 'diary' && (
+                    <PersonalDiaryView
+                      userId={currentUser.uid}
+                      entries={diaryEntries}
+                    />
+                  )}
+
+                  {activeView === 'voice' && (
+                    <VoiceJournalView
+                      userId={currentUser.uid}
+                      recordings={voiceJournals}
+                    />
+                  )}
+
+                  {activeView === 'memories' && (
+                    <MemoriesView
+                      userId={currentUser.uid}
+                      memories={memories}
+                    />
+                  )}
+
+                  {activeView === 'history' && (
+                    <ReflectionHistoryView
+                      diaryEntries={diaryEntries}
+                      voiceJournals={voiceJournals}
+                      memories={memories}
+                    />
+                  )}
+                </>
               )}
             </div>
           )}

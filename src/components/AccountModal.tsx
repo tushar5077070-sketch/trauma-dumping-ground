@@ -12,6 +12,7 @@ import {
   Lock,
 } from 'lucide-react';
 import {
+  ALL_PREMIUM_FEATURES_FREE_FOR_NOW,
   LoginEvent,
   SECRET_GARDEN_PLANS,
   SecretGardenMembership,
@@ -340,7 +341,9 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     </div>
                   ) : (
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Currently on the Open Meadow Free Plan (₹0).
+                      {ALL_PREMIUM_FEATURES_FREE_FOR_NOW
+                        ? 'Open Meadow (₹0) — All Secret Garden features are currently free & unlocked for everyone.'
+                        : 'Currently on the Open Meadow Free Plan (₹0).'}
                     </p>
                   )}
                 </div>

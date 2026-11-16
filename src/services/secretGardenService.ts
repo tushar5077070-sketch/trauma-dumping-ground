@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import {
+  ALL_PREMIUM_FEATURES_FREE_FOR_NOW,
   DEFAULT_GARDEN_CUSTOMISATION,
   DiaryEntry,
   ExclusiveFloraPresetId,
@@ -62,6 +63,7 @@ export function hasEffectiveSecretGardenAccess(
   membership: SecretGardenMembership | null,
   isAdmin: boolean
 ): boolean {
+  if (ALL_PREMIUM_FEATURES_FREE_FOR_NOW) return true;
   if (isAdmin) return true;
   if (!membership) return false;
   if (membership.status === 'active') return true;
@@ -324,17 +326,17 @@ export async function saveGardenCustomisationForUser(
     if (!snap.exists()) {
       await setDoc(docRef, {
         userId: uid,
-        planId: hasPremiumAccess ? 'secret_garden_annual' : 'free',
-        status: hasPremiumAccess ? 'active' : 'free',
+        planId: 'free',
+        status: 'free',
         hasUsedFreeTrial: false,
         trialStartedAt: '',
         trialEndsAt: '',
-        billingCycle: hasPremiumAccess ? 'annual' : 'none',
+        billingCycle: 'none',
         priceInr: 0,
         startedAt: getTodayIsoDate(),
         nextBillingAt: '',
         autoRenew: false,
-        paymentMode: hasPremiumAccess ? 'admin_assigned' : 'none',
+        paymentMode: 'none',
         gardenTheme: sanitizedSettings.gardenTheme,
         gardenBackground: sanitizedSettings.gardenBackground,
         gardenEffect: sanitizedSettings.gardenEffect,
@@ -346,34 +348,21 @@ export async function saveGardenCustomisationForUser(
       const existingData = snap.data();
       const status = (existingData?.status as string) || 'free';
       const existingCanCustomise =
-        status === 'trialing' || status === 'active';
+        ALL_PREMIUM_FEATURES_FREE_FOR_NOW ||
+        status === 'trialing' ||
+        status === 'active';
 
-      if (hasPremiumAccess && !existingCanCustomise) {
-        await updateDoc(docRef, {
-          planId: 'secret_garden_annual',
-          status: 'active',
-          billingCycle: 'annual',
-          priceInr: 0,
-          paymentMode: 'admin_assigned',
-          gardenTheme: sanitizedSettings.gardenTheme,
-          gardenBackground: sanitizedSettings.gardenBackground,
-          gardenEffect: sanitizedSettings.gardenEffect,
-          exclusiveFloraPreset: sanitizedSettings.exclusiveFloraPreset,
-          updatedAt: serverTimestamp(),
-        });
-      } else {
-        const toWrite = existingCanCustomise
-          ? sanitizedSettings
-          : DEFAULT_GARDEN_CUSTOMISATION;
+      const toWrite = existingCanCustomise
+        ? sanitizedSettings
+        : DEFAULT_GARDEN_CUSTOMISATION;
 
-        await updateDoc(docRef, {
-          gardenTheme: toWrite.gardenTheme,
-          gardenBackground: toWrite.gardenBackground,
-          gardenEffect: toWrite.gardenEffect,
-          exclusiveFloraPreset: toWrite.exclusiveFloraPreset,
-          updatedAt: serverTimestamp(),
-        });
-      }
+      await updateDoc(docRef, {
+        gardenTheme: toWrite.gardenTheme,
+        gardenBackground: toWrite.gardenBackground,
+        gardenEffect: toWrite.gardenEffect,
+        exclusiveFloraPreset: toWrite.exclusiveFloraPreset,
+        updatedAt: serverTimestamp(),
+      });
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);

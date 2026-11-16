@@ -9,6 +9,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import {
+  ALL_PREMIUM_FEATURES_FREE_FOR_NOW,
   SECRET_GARDEN_PLANS,
   SecretGardenMembership,
 } from '../../types/garden';
@@ -64,6 +65,20 @@ export const SubscriptionSettingsView: React.FC<
 
   return (
     <div className="space-y-5">
+      {ALL_PREMIUM_FEATURES_FREE_FOR_NOW && (
+        <div className="flex items-start gap-2.5 p-4 rounded-2xl bg-emerald-50 border border-emerald-200/80 text-xs text-emerald-900">
+          <Sparkles className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <p className="font-semibold">All Secret Garden Features Are Free Right Now</p>
+            <p className="text-emerald-900/85 leading-relaxed">
+              Every personal feature — Personal Diary, Voice Journaling, My Memories,
+              Reflection History, and Exclusive Garden Customisation — is unlocked at ₹0
+              for everyone. No trial activation or payment plan is required.
+            </p>
+          </div>
+        </div>
+      )}
+
       {feedback && (
         <div className="flex items-start gap-2 p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800">
           <Check className="w-4 h-4 shrink-0 mt-0.5" />

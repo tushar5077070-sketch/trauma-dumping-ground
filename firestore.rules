@@ -36,17 +36,7 @@ service cloud.firestore {
     }
 
     function hasSecretGardenAccess(userId) {
-      return isAdmin() || (
-        exists(/databases/$(database)/documents/secretGardenMemberships/$(userId)) &&
-        get(/databases/$(database)/documents/secretGardenMemberships/$(userId)).data.status in ['trialing', 'active']
-      );
-    }
-
-    function isBasicFreeGardenCustomisation(data) {
-      return data.gardenTheme == 'meadow' &&
-        data.gardenBackground == 'classic_sky' &&
-        data.gardenEffect == 'breeze' &&
-        data.exclusiveFloraPreset == 'classic';
+      return isOwner(userId) || isAdmin();
     }
 
     // 3. Entity Validation Blueprints (Synchronized with firebase-blueprint.json)
@@ -404,8 +394,7 @@ service cloud.firestore {
         data.createdAt is timestamp &&
         data.updatedAt is timestamp &&
         (data.status != 'trialing' || (data.hasUsedFreeTrial == true && data.autoRenew == false && data.priceInr == 0 && data.paymentMode == 'trial_no_card')) &&
-        (data.status != 'free' || (data.planId == 'free' && data.priceInr == 0 && data.autoRenew == false)) &&
-        (data.status in ['trialing', 'active'] || isBasicFreeGardenCustomisation(data));
+        (data.status != 'free' || (data.planId == 'free' && data.priceInr == 0 && data.autoRenew == false));
     }
 
     function isValidDiaryEntry(data) {

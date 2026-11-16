@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Sparkles } from 'lucide-react';
+import { X } from 'lucide-react';
 import { SEED_OPTIONS } from '../types/garden';
 import { SeedIconIllustration } from './FlowerIllustration';
 
@@ -138,7 +138,6 @@ export const InfoModals: React.FC<InfoModalProps> = ({
             }}
             className="px-4 sm:px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
           >
-            <Sparkles className="w-3.5 h-3.5 text-amber-200" />
             <span>Plant a Seed 🌱</span>
           </button>
         </div>

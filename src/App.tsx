@@ -9,7 +9,6 @@ import {
   Volume2,
   VolumeX,
   Flower2,
-  Sparkles,
   Compass,
   LogIn,
   ShieldCheck,
@@ -322,7 +321,6 @@ export default function App() {
                 onClick={() => setIsWriteModalOpen(true)}
                 className="sm:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md border border-white/25 text-xs font-medium text-white shadow-sm transition-all whitespace-nowrap cursor-pointer shrink-0"
               >
-                <Sparkles className="w-3 h-3 text-amber-200 shrink-0" />
                 <span>Plant a Seed 🌱</span>
               </button>
             </div>
@@ -435,7 +433,6 @@ export default function App() {
                 onClick={() => setIsWriteModalOpen(true)}
                 className="hidden sm:inline-flex items-center gap-1.5 px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md border border-white/25 text-xs md:text-sm font-medium text-white shadow-sm transition-all whitespace-nowrap cursor-pointer shrink-0"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-200 shrink-0" />
                 <span>Plant a Seed 🌱</span>
               </button>
             </div>

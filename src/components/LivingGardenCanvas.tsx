@@ -152,8 +152,8 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         current[story.storyId] = {
           angle: 0,
           velocity: 0,
-          scale: natScale,
-          scaleVelocity: 0,
+          scale: story.isNewlyPlanted ? natScale * 0.18 : natScale,
+          scaleVelocity: story.isNewlyPlanted ? 0.04 : 0,
           phase: idx * 1.17,
           speed: 1.05 + (idx % 5) * 0.14,
           naturalScale: natScale,

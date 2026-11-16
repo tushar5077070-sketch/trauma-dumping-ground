@@ -7,7 +7,11 @@ import {
   plantNewStory,
 } from '../services/gardenService';
 import { soundscape } from '../utils/soundscape';
-import { MeadowFlowerSvg, SeedIconIllustration } from './FlowerIllustration';
+import { SeedIconIllustration } from './FlowerIllustration';
+import {
+  PlantingPhase,
+  RealisticPlantingAnimation,
+} from './RealisticPlantingAnimation';
 
 interface WriteStoryModalProps {
   isOpen: boolean;
@@ -17,15 +21,6 @@ interface WriteStoryModalProps {
   onClose: () => void;
   onStoryPlanted: (newStory: Story) => void;
 }
-
-type PlantingPhase =
-  | 'writing'
-  | 'seed-falling'
-  | 'soil-light'
-  | 'stem-growing'
-  | 'leaves-unfurling'
-  | 'flower-blooming'
-  | 'complete';
 
 export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
   isOpen,
@@ -91,13 +86,7 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
       });
       setPlantedStory(created);
       soundscape.playBloomChord();
-
       setPhase('seed-falling');
-      setTimeout(() => setPhase('soil-light'), 900);
-      setTimeout(() => setPhase('stem-growing'), 1800);
-      setTimeout(() => setPhase('leaves-unfurling'), 2700);
-      setTimeout(() => setPhase('flower-blooming'), 3600);
-      setTimeout(() => setPhase('complete'), 4500);
     } catch (err) {
       let friendlyMessage =
         'Unable to plant your seed right now. Please try again.';
@@ -336,95 +325,34 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
           </div>
         </form>
       ) : (
-        /* Choreographed Planting Animation Sanctuary */
-        <div className="relative w-full max-w-lg rounded-3xl bg-gradient-to-b from-sky-100/95 via-white/95 to-emerald-50/95 backdrop-blur-xl shadow-2xl border border-white/90 p-6 sm:p-8 text-center overflow-hidden">
-          <div className="relative h-56 sm:h-64 flex flex-col items-center justify-end pb-6">
-            {phase === 'seed-falling' && (
-              <div className="animate-bounce mb-16 flex flex-col items-center">
-                <div className="w-5 h-7 rounded-full bg-amber-300 shadow-lg shadow-amber-200 border border-amber-400" />
-              </div>
-            )}
+        /* Choreographed 60fps Botanical Time-Lapse Planting Sanctuary */
+        <div className="relative w-full max-w-lg rounded-3xl bg-gradient-to-b from-sky-100/95 via-white/95 to-emerald-50/95 backdrop-blur-xl shadow-2xl border border-white/90 p-5 sm:p-7 text-center overflow-hidden space-y-4">
+          <RealisticPlantingAnimation
+            seedType={selectedSeed}
+            flowerVariant={
+              plantedStory?.flowerVariant ||
+              pickFlowerVariantForSeed(selectedSeed)
+            }
+            onPhaseChange={setPhase}
+          />
 
-            {phase !== 'seed-falling' && (
-              <div className="absolute bottom-4 w-44 h-8 rounded-full bg-amber-200/60 blur-md animate-pulse-aura" />
-            )}
-
-            {phase === 'stem-growing' && (
-              <svg
-                width="80"
-                height="140"
-                viewBox="0 0 80 140"
-                className="overflow-visible"
-              >
-                <path
-                  d="M 40 135 Q 40 90 40 50"
-                  stroke="#6DA651"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  fill="none"
-                />
-              </svg>
-            )}
-
-            {phase === 'leaves-unfurling' && (
-              <svg
-                width="100"
-                height="160"
-                viewBox="0 0 100 160"
-                className="overflow-visible"
-              >
-                <path
-                  d="M 50 150 Q 48 95 50 38"
-                  stroke="#6DA651"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  fill="none"
-                />
-                <path
-                  d="M 50 110 Q 22 92 30 74 Q 45 84 50 110"
-                  fill="#7FB862"
-                />
-                <path
-                  d="M 50 96 Q 78 78 70 60 Q 55 70 50 96"
-                  fill="#7FB862"
-                />
-              </svg>
-            )}
-
-            {(phase === 'flower-blooming' || phase === 'complete') && (
-              <div className="w-32 h-52 transition-transform duration-700 scale-110">
-                <MeadowFlowerSvg
-                  variant={
-                    plantedStory?.flowerVariant ||
-                    pickFlowerVariantForSeed(selectedSeed)
-                  }
-                  isHovered={true}
-                  stemHeight={130}
-                  uniqueId="planted-preview"
-                />
-              </div>
-            )}
-
-            <div className="w-52 h-5 rounded-full bg-emerald-800/25 border-t border-emerald-700/20" />
-          </div>
-
-          <div className="min-h-[110px] flex flex-col items-center justify-center">
+          <div className="min-h-[104px] flex flex-col items-center justify-center">
             {phase !== 'complete' ? (
               <>
-                <p className="font-editorial text-xl sm:text-2xl font-medium text-slate-800">
+                <p className="font-editorial text-xl sm:text-2xl font-medium text-slate-800 transition-opacity duration-300">
                   {phase === 'seed-falling' &&
                     'A quiet seed meets the earth...'}
                   {phase === 'soil-light' &&
-                    'Taking root in warm meadow soil...'}
+                    'Taking root in damp meadow soil...'}
                   {phase === 'stem-growing' &&
-                    'Reaching gently toward the sky...'}
+                    'A tender shoot reaches for the light...'}
                   {phase === 'leaves-unfurling' &&
-                    'Unfurling leaves in the breeze...'}
+                    'Leaves unfurl as the bud awakens...'}
                   {phase === 'flower-blooming' &&
-                    'Blooming into the garden...'}
+                    'Blooming gently into the meadow...'}
                 </p>
                 <p className="text-xs text-slate-500 mt-1.5">
-                  Planting {currentSeed.name} for {anonymousId}
+                  Planting {currentSeed.name} · {anonymousId}
                 </p>
               </>
             ) : (

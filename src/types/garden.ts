@@ -1133,3 +1133,80 @@ export const EXCLUSIVE_FLORA_CATALOG: {
   },
 ];
 
+// =========================================================================
+// MY INNER GARDEN — AI VOICE JOURNALING, MEMORY & EMOTIONAL PATTERNS
+// =========================================================================
+
+export type InnerEntryKind = 'voice' | 'text' | 'voice_and_text';
+export type InnerStorageChoice = 'audio' | 'transcript' | 'both';
+
+export interface InnerEmotionItem {
+  label: string;
+  intensity: number; // 1..100 approximate text interpretation
+}
+
+export interface InnerJournalEntry {
+  entryId: string;
+  userId: string;
+  entryKind: InnerEntryKind;
+  storageChoice: InnerStorageChoice;
+  title: string;
+  transcript: string;
+  durationSeconds: number;
+  mimeType: string;
+  audioDataUrl: string;
+  recordedDate: string; // YYYY-MM-DD
+  allowAiAnalysis: boolean;
+  aiSummary: string;
+  aiReflection: string;
+  primaryEmotion: string;
+  emotions: InnerEmotionItem[];
+  themes: string[];
+  emotionConfidenceNote: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InnerReflectionMemory {
+  reflectionId: string;
+  userId: string;
+  periodType: 'weekly' | 'monthly';
+  periodLabel: string;
+  periodStart: string;
+  periodEnd: string;
+  title: string;
+  reflectionText: string;
+  gentleTakeaway: string;
+  recurringThemes: string[];
+  sourceEntryIds: string[];
+  entryCountAnalyzed: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InnerPrivacyPrefs {
+  prefId: string;
+  userId: string;
+  allowAudioStorageConsent: boolean;
+  allowAiProcessingConsent: boolean;
+  consentAcknowledgedAt: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface InnerAiServerStatus {
+  configured: boolean;
+  models: {
+    transcription: string;
+    analysis: string;
+  };
+  trainingOptOutNote: string;
+}
+
+export interface ExtractedThemeItem {
+  theme: string;
+  description: string;
+  frequency: number;
+  entryIds: string[];
+}
+

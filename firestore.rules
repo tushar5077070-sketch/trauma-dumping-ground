@@ -530,6 +530,190 @@ service cloud.firestore {
         data.savedAt is timestamp;
     }
 
+    function isValidInnerJournalEntry(data) {
+      return data.keys().hasAll([
+          'entryId',
+          'userId',
+          'entryKind',
+          'storageChoice',
+          'title',
+          'transcript',
+          'durationSeconds',
+          'mimeType',
+          'audioDataUrl',
+          'recordedDate',
+          'allowAiAnalysis',
+          'aiSummary',
+          'aiReflection',
+          'primaryEmotion',
+          'emotionLabels',
+          'emotionIntensities',
+          'themes',
+          'emotionConfidenceNote',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'entryId',
+          'userId',
+          'entryKind',
+          'storageChoice',
+          'title',
+          'transcript',
+          'durationSeconds',
+          'mimeType',
+          'audioDataUrl',
+          'recordedDate',
+          'allowAiAnalysis',
+          'aiSummary',
+          'aiReflection',
+          'primaryEmotion',
+          'emotionLabels',
+          'emotionIntensities',
+          'themes',
+          'emotionConfidenceNote',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.entryId) &&
+        isValidId(data.userId) &&
+        data.entryKind is string &&
+        data.entryKind in ['voice', 'text', 'voice_and_text'] &&
+        data.storageChoice is string &&
+        data.storageChoice in ['audio', 'transcript', 'both'] &&
+        data.title is string &&
+        data.title.size() <= 140 &&
+        data.transcript is string &&
+        data.transcript.size() <= 8000 &&
+        data.durationSeconds is int &&
+        data.durationSeconds >= 0 &&
+        data.durationSeconds <= 300 &&
+        data.mimeType is string &&
+        data.mimeType.size() <= 80 &&
+        data.audioDataUrl is string &&
+        data.audioDataUrl.size() <= 500000 &&
+        (data.audioDataUrl == '' || data.audioDataUrl.matches('^data:audio/.+;base64,[A-Za-z0-9+/=]+$')) &&
+        data.recordedDate is string &&
+        data.recordedDate.size() >= 4 &&
+        data.recordedDate.size() <= 40 &&
+        data.allowAiAnalysis is bool &&
+        data.aiSummary is string &&
+        data.aiSummary.size() <= 1000 &&
+        data.aiReflection is string &&
+        data.aiReflection.size() <= 2500 &&
+        data.primaryEmotion is string &&
+        data.primaryEmotion.size() <= 50 &&
+        data.emotionLabels is list &&
+        data.emotionLabels.size() <= 6 &&
+        (data.emotionLabels.size() == 0 || data.emotionLabels[0] is string) &&
+        data.emotionIntensities is list &&
+        data.emotionIntensities.size() <= 6 &&
+        (data.emotionIntensities.size() == 0 || data.emotionIntensities[0] is int) &&
+        data.themes is list &&
+        data.themes.size() <= 6 &&
+        (data.themes.size() == 0 || data.themes[0] is string) &&
+        data.emotionConfidenceNote is string &&
+        data.emotionConfidenceNote.size() <= 300 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidInnerReflectionMemory(data) {
+      return data.keys().hasAll([
+          'reflectionId',
+          'userId',
+          'periodType',
+          'periodLabel',
+          'periodStart',
+          'periodEnd',
+          'title',
+          'reflectionText',
+          'gentleTakeaway',
+          'recurringThemes',
+          'sourceEntryIds',
+          'entryCountAnalyzed',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'reflectionId',
+          'userId',
+          'periodType',
+          'periodLabel',
+          'periodStart',
+          'periodEnd',
+          'title',
+          'reflectionText',
+          'gentleTakeaway',
+          'recurringThemes',
+          'sourceEntryIds',
+          'entryCountAnalyzed',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.reflectionId) &&
+        isValidId(data.userId) &&
+        data.periodType is string &&
+        data.periodType in ['weekly', 'monthly'] &&
+        data.periodLabel is string &&
+        data.periodLabel.size() >= 1 &&
+        data.periodLabel.size() <= 80 &&
+        data.periodStart is string &&
+        data.periodStart.size() >= 4 &&
+        data.periodStart.size() <= 40 &&
+        data.periodEnd is string &&
+        data.periodEnd.size() >= 4 &&
+        data.periodEnd.size() <= 40 &&
+        data.title is string &&
+        data.title.size() >= 1 &&
+        data.title.size() <= 140 &&
+        data.reflectionText is string &&
+        data.reflectionText.size() >= 1 &&
+        data.reflectionText.size() <= 4000 &&
+        data.gentleTakeaway is string &&
+        data.gentleTakeaway.size() <= 400 &&
+        data.recurringThemes is list &&
+        data.recurringThemes.size() <= 8 &&
+        (data.recurringThemes.size() == 0 || data.recurringThemes[0] is string) &&
+        data.sourceEntryIds is list &&
+        data.sourceEntryIds.size() <= 50 &&
+        (data.sourceEntryIds.size() == 0 || data.sourceEntryIds[0] is string) &&
+        data.entryCountAnalyzed is int &&
+        data.entryCountAnalyzed >= 0 &&
+        data.entryCountAnalyzed <= 500 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidInnerPrivacyPrefs(data) {
+      return data.keys().hasAll([
+          'prefId',
+          'userId',
+          'allowAudioStorageConsent',
+          'allowAiProcessingConsent',
+          'consentAcknowledgedAt',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'prefId',
+          'userId',
+          'allowAudioStorageConsent',
+          'allowAiProcessingConsent',
+          'consentAcknowledgedAt',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.prefId) &&
+        isValidId(data.userId) &&
+        data.allowAudioStorageConsent is bool &&
+        data.allowAiProcessingConsent is bool &&
+        data.consentAcknowledgedAt is string &&
+        data.consentAcknowledgedAt.size() <= 40 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
     // 4. Collection Rules: Stories
     match /stories/{storyId} {
       allow get: if isValidId(storyId) && (existing().moderationStatus == 'approved' || isAdmin());
@@ -789,6 +973,122 @@ service cloud.firestore {
           hasSecretGardenAccess(userId);
 
         allow delete: if isOwner(userId) && isValidId(userId) && isValidId(memoryId);
+      }
+
+      // 6D. My Inner Garden: Private Voice & Text Journal Entries (Strictly Owner-Only)
+      match /innerJournalEntries/{entryId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(entryId);
+        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(entryId) &&
+          isValidInnerJournalEntry(incoming()) &&
+          incoming().entryId == entryId &&
+          incoming().userId == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+
+        allow update: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(entryId) &&
+          isValidInnerJournalEntry(incoming()) &&
+          incoming().entryId == existing().entryId &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'entryKind',
+            'storageChoice',
+            'title',
+            'transcript',
+            'durationSeconds',
+            'mimeType',
+            'audioDataUrl',
+            'recordedDate',
+            'allowAiAnalysis',
+            'aiSummary',
+            'aiReflection',
+            'primaryEmotion',
+            'emotionLabels',
+            'emotionIntensities',
+            'themes',
+            'emotionConfidenceNote',
+            'updatedAt'
+          ]);
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(entryId);
+      }
+
+      // 6E. My Inner Garden: Weekly & Monthly AI Reflection Memories (Strictly Owner-Only)
+      match /innerReflections/{reflectionId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(reflectionId);
+        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(reflectionId) &&
+          isValidInnerReflectionMemory(incoming()) &&
+          incoming().reflectionId == reflectionId &&
+          incoming().userId == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+
+        allow update: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(reflectionId) &&
+          isValidInnerReflectionMemory(incoming()) &&
+          incoming().reflectionId == existing().reflectionId &&
+          incoming().userId == existing().userId &&
+          incoming().periodType == existing().periodType &&
+          incoming().periodLabel == existing().periodLabel &&
+          incoming().periodStart == existing().periodStart &&
+          incoming().periodEnd == existing().periodEnd &&
+          incoming().recurringThemes == existing().recurringThemes &&
+          incoming().sourceEntryIds == existing().sourceEntryIds &&
+          incoming().entryCountAnalyzed == existing().entryCountAnalyzed &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'title',
+            'reflectionText',
+            'gentleTakeaway',
+            'updatedAt'
+          ]);
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(reflectionId);
+      }
+
+      // 6F. My Inner Garden: Privacy & AI Consent Preferences (Strictly Owner-Only)
+      match /innerPrivacyPrefs/{prefId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(prefId);
+        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(prefId) &&
+          isValidInnerPrivacyPrefs(incoming()) &&
+          incoming().prefId == prefId &&
+          incoming().userId == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+
+        allow update: if isOwner(userId) &&
+          isValidId(userId) &&
+          isValidId(prefId) &&
+          isValidInnerPrivacyPrefs(incoming()) &&
+          incoming().prefId == existing().prefId &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'allowAudioStorageConsent',
+            'allowAiProcessingConsent',
+            'consentAcknowledgedAt',
+            'updatedAt'
+          ]);
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(prefId);
       }
     }
 

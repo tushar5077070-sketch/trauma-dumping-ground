@@ -834,6 +834,256 @@
         "personalNote",
         "savedAt"
       ]
+    },
+    "InnerJournalEntry": {
+      "title": "InnerJournalEntry",
+      "description": "Private My Inner Garden voice/text journal entry isolated per user with per-entry AI opt-in control and optional AI analysis.",
+      "type": "object",
+      "properties": {
+        "entryId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "entryKind": {
+          "type": "string",
+          "enum": ["voice", "text", "voice_and_text"]
+        },
+        "storageChoice": {
+          "type": "string",
+          "enum": ["audio", "transcript", "both"]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 140
+        },
+        "transcript": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 8000
+        },
+        "durationSeconds": {
+          "type": "integer"
+        },
+        "mimeType": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 80
+        },
+        "audioDataUrl": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 500000
+        },
+        "recordedDate": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 40
+        },
+        "allowAiAnalysis": {
+          "type": "boolean"
+        },
+        "aiSummary": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 1000
+        },
+        "aiReflection": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 2500
+        },
+        "primaryEmotion": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 50
+        },
+        "emotionLabels": {
+          "type": "array"
+        },
+        "emotionIntensities": {
+          "type": "array"
+        },
+        "themes": {
+          "type": "array"
+        },
+        "emotionConfidenceNote": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "entryId",
+        "userId",
+        "entryKind",
+        "storageChoice",
+        "title",
+        "transcript",
+        "durationSeconds",
+        "mimeType",
+        "audioDataUrl",
+        "recordedDate",
+        "allowAiAnalysis",
+        "aiSummary",
+        "aiReflection",
+        "primaryEmotion",
+        "emotionLabels",
+        "emotionIntensities",
+        "themes",
+        "emotionConfidenceNote",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "InnerReflectionMemory": {
+      "title": "InnerReflectionMemory",
+      "description": "Weekly or monthly empathetic AI reflection synthesized strictly from user-opted-in private journal entries.",
+      "type": "object",
+      "properties": {
+        "reflectionId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "periodType": {
+          "type": "string",
+          "enum": ["weekly", "monthly"]
+        },
+        "periodLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "periodStart": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 40
+        },
+        "periodEnd": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 40
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 140
+        },
+        "reflectionText": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "gentleTakeaway": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 400
+        },
+        "recurringThemes": {
+          "type": "array"
+        },
+        "sourceEntryIds": {
+          "type": "array"
+        },
+        "entryCountAnalyzed": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "reflectionId",
+        "userId",
+        "periodType",
+        "periodLabel",
+        "periodStart",
+        "periodEnd",
+        "title",
+        "reflectionText",
+        "gentleTakeaway",
+        "recurringThemes",
+        "sourceEntryIds",
+        "entryCountAnalyzed",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "InnerPrivacyPrefs": {
+      "title": "InnerPrivacyPrefs",
+      "description": "Explicit per-user consent settings for storing private voice audio and processing journal entries with Gemini AI.",
+      "type": "object",
+      "properties": {
+        "prefId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "allowAudioStorageConsent": {
+          "type": "boolean"
+        },
+        "allowAiProcessingConsent": {
+          "type": "boolean"
+        },
+        "consentAcknowledgedAt": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "prefId",
+        "userId",
+        "allowAudioStorageConsent",
+        "allowAiProcessingConsent",
+        "consentAcknowledgedAt",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -880,6 +1130,18 @@
     "/userAccounts/{userId}/memories/{memoryId}": {
       "schema": "SavedMemory",
       "description": "Private bookmarked memories strictly isolated to the owning user."
+    },
+    "/userAccounts/{userId}/innerJournalEntries/{entryId}": {
+      "schema": "InnerJournalEntry",
+      "description": "Private My Inner Garden voice and text entries strictly isolated to the owning user."
+    },
+    "/userAccounts/{userId}/innerReflections/{reflectionId}": {
+      "schema": "InnerReflectionMemory",
+      "description": "Private weekly and monthly AI reflections strictly isolated to the owning user."
+    },
+    "/userAccounts/{userId}/innerPrivacyPrefs/{prefId}": {
+      "schema": "InnerPrivacyPrefs",
+      "description": "Explicit user privacy consent toggles for My Inner Garden audio storage and AI processing."
     }
   }
 }

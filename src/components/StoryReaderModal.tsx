@@ -11,6 +11,7 @@ import {
   X,
   Bookmark,
   BookmarkCheck,
+  AlertCircle,
 } from 'lucide-react';
 import { SEED_OPTIONS, Story, SupportiveMessage } from '../types/garden';
 import {
@@ -69,6 +70,7 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
   const [messageText, setMessageText] = useState('');
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const [messageSuccess, setMessageSuccess] = useState(false);
+  const [messageError, setMessageError] = useState<string | null>(null);
   const [messages, setMessages] = useState<SupportiveMessage[]>([]);
   const [savingId, setSavingId] = useState<string | null>(null);
 
@@ -87,6 +89,7 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
     setShowMessageComposer(false);
     setMessageText('');
     setMessageSuccess(false);
+    setMessageError(null);
     setIsWarningRevealed(!story.contentWarning);
     setShowReportPanel(false);
     setReportSubmitted(false);
@@ -121,6 +124,8 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
     e.preventDefault();
     if (messageText.trim().length < 2 || isSendingMessage) return;
     setIsSendingMessage(true);
+    setMessageError(null);
+    setMessageSuccess(false);
     try {
       const created = await leaveSupportiveMessage(story, messageText);
       setMessages((prev) =>
@@ -132,8 +137,12 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
       setMessageSuccess(true);
       soundscape.playHoverChime();
       setTimeout(() => setMessageSuccess(false), 3000);
-    } catch {
-      // Keep UI responsive
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'This message could not be sent. Please share only kind, supportive words.';
+      setMessageError(msg);
     } finally {
       setIsSendingMessage(false);
     }
@@ -375,7 +384,10 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
                   type="text"
                   maxLength={500}
                   value={messageText}
-                  onChange={(e) => setMessageText(e.target.value)}
+                  onChange={(e) => {
+                    setMessageText(e.target.value);
+                    if (messageError) setMessageError(null);
+                  }}
                   placeholder="Remind them they aren't carrying this alone..."
                   className="flex-1 rounded-xl bg-white border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-300"
                 />
@@ -385,9 +397,15 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
                   className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  <span>Send</span>
+                  <span>{isSendingMessage ? 'Checking...' : 'Send'}</span>
                 </button>
               </div>
+              {messageError && (
+                <div className="flex items-start gap-2 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-800">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                  <span>{messageError}</span>
+                </div>
+              )}
               {messageSuccess && (
                 <p className="text-xs text-emerald-700 font-medium">
                   Your kind note has been placed beside this flower.

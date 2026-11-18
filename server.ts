@@ -573,10 +573,170 @@ Synthesize an empathetic, conversational ${periodTypeLabel} memory reflection ce
     }
   });
 
+  // 6. Public Sanctuary Content Moderation (Supportive Messages & Planted Stories)
+  app.post('/api/ai/moderate-content', async (req: Request, res: Response) => {
+    const { text, contentType, storyContext } = req.body as {
+      text?: string;
+      contentType?: 'supportive_message' | 'story';
+      storyContext?: string;
+    };
+
+    const cleanText = typeof text === 'string' ? text.trim().slice(0, 2000) : '';
+    if (!cleanText) {
+      return res.json({
+        allowed: false,
+        category: 'unkind_tone',
+        reason: 'Please write a message before sending.',
+      });
+    }
+
+    // Server-side deterministic blocklist (always runs even if Gemini is unavailable)
+    const lower = cleanText
+      .toLowerCase()
+      .replace(/@/g, 'a')
+      .replace(/0/g, 'o')
+      .replace(/1/g, 'i')
+      .replace(/3/g, 'e')
+      .replace(/\$/g, 's')
+      .replace(/!/g, 'i')
+      .replace(/([a-z])\1{2,}/g, '$1');
+
+    if (contentType === 'supportive_message') {
+      const blockedReplyRegex =
+        /\b(pathetic|worthless|useless|loser|losers|weak|weakling|stupid|idiot|idiotic|moron|dumb|dumbass|fool|clown|trash|garbage|filth|scum|scumbag|disgusting|gross|ugly|freak|weirdo|psycho|crazy|insane|delusional|retard|retarded|lame|cringe|cringey|corny|dramatic|overdramatic|overreacting|crybaby|whiner|whining|fake|liar|fraud|hypocrite|coward|selfish|narcissist|annoying|boring|ridiculous|laughable|pitiful|shameful|embarrassing|disgrace|failure|parasite|deserved|kys|stfu|gtfo|fuck|fucking|fucker|motherfucker|shit|bullshit|bitch|asshole|bastard|dick|pussy|cunt|slut|whore|faggot|nigger|nigga|boohoo|womp\s*womp|nobody\s+cares|no\s+one\s+cares|who\s+cares|shut\s+up|grow\s+up|man\s+up|get\s+over\s+it|stop\s+crying|cry\s+more|kill\s*your\s*self|go\s+die|attention\s+seeker|you\s+suck)\b/i;
+
+      if (blockedReplyRegex.test(cleanText) || blockedReplyRegex.test(lower)) {
+        return res.json({
+          allowed: false,
+          category: 'insult_or_belittling',
+          reason:
+            'Unsaid only allows gentle, supportive replies. Insulting, dismissive, or hurtful words cannot be sent to someone sharing a vulnerable story.',
+        });
+      }
+    } else {
+      const blockedStoryRegex =
+        /\b(kill\s*your\s*self|k\s*y\s*s|you\s+should\s+die|faggot|nigger|nigga|kike|chink|spic)\b/i;
+      if (blockedStoryRegex.test(cleanText) || blockedStoryRegex.test(lower)) {
+        return res.json({
+          allowed: false,
+          category: 'harassment',
+          reason:
+            'Content containing hate speech, slurs, or encouragement of harm cannot be planted in the garden.',
+        });
+      }
+    }
+
+    const ai = getGeminiClient();
+    if (!ai) {
+      return res.json({ allowed: true, category: 'clean' });
+    }
+
+    try {
+      const isReply = contentType === 'supportive_message';
+      const prompt = isReply
+        ? `Evaluate whether this anonymous reply left on a vulnerable person's emotional story is safe, kind, and supportive.
+Original story context (optional): """${(storyContext || '').slice(0, 500)}"""
+Proposed reply: """${cleanText}"""`
+        : `Evaluate whether this anonymous personal story being planted in an emotional healing meadow is safe to publish (allow honest personal grief, trauma, sadness, or struggle; block hate speech, targeted harassment, bullying, spam, or encouragement of self-harm).
+Proposed story: """${cleanText}"""`;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-4-hydrogen',
+        contents: prompt,
+        config: {
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          systemInstruction: isReply
+            ? `You are the compassionate safety guardian for Unsaid, an emotional sanctuary.
+When someone clicks "Leave a kind message", their reply MUST be genuinely kind, empathetic, or comforting.
+Set allowed=false if the reply contains ANY of the following:
+- Insults, name-calling, or demeaning adjectives (e.g., "pathetic", "weak", "loser", "cringe", "stupid", "dramatic", "crybaby")
+- Sarcasm, mockery, laughing at the author, or passive-aggressive hostility
+- Dismissiveness or invalidation (e.g., "get over it", "nobody cares", "grow up", "stop complaining", "it's your fault")
+- Profanity, slurs, threats, or encouragement of self-harm
+- Unhelpful criticism or judgment
+If allowed=false, provide a gentle, clear 1-sentence reason explaining that only supportive, compassionate words may be left on a flower.`
+            : `You are the safety guardian for Unsaid. Allow personal stories about grief, heartbreak, anxiety, family conflict, burnout, and emotional pain. Set allowed=false ONLY if the text attacks/bullies others, contains hate speech/slurs, promotes self-harm/violence, or is obvious spam/gibberish.`,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              allowed: { type: Type.BOOLEAN },
+              category: { type: Type.STRING },
+              reason: { type: Type.STRING },
+            },
+            required: ['allowed', 'category', 'reason'],
+          },
+        },
+      });
+
+      const parsed = JSON.parse((response.text ?? '{}').trim()) as {
+        allowed?: boolean;
+        category?: string;
+        reason?: string;
+      };
+
+      return res.json({
+        allowed: parsed.allowed !== false,
+        category: String(parsed.category || 'clean'),
+        reason: String(parsed.reason || ''),
+      });
+    } catch {
+      return res.json({ allowed: true, category: 'clean' });
+    }
+  });
+
   if (!IS_PROD) {
+    process.env.DISABLE_HMR = 'true';
+
+    // Serve a WebSocket-free Vite client shim so @vite/client never throws WebSocket errors in sandboxed iframes
+    app.get('/@vite/client', (_req: Request, res: Response) => {
+      res.type('application/javascript').send(`
+const sheetsMap = new Map();
+export function updateStyle(id, content) {
+  let style = sheetsMap.get(id);
+  if (!style) {
+    style = document.createElement('style');
+    style.setAttribute('type', 'text/css');
+    style.setAttribute('data-vite-dev-id', id);
+    style.textContent = content;
+    document.head.appendChild(style);
+  } else if (style.textContent !== content) {
+    style.textContent = content;
+  }
+  sheetsMap.set(id, style);
+}
+export function removeStyle(id) {
+  const style = sheetsMap.get(id);
+  if (style) {
+    document.head.removeChild(style);
+    sheetsMap.delete(id);
+  }
+}
+export function createHotContext() {
+  return {
+    accept() {},
+    acceptExports() {},
+    dispose() {},
+    prune() {},
+    invalidate() {},
+    on() {},
+    off() {},
+    send() {},
+    data: {}
+  };
+}
+export function injectQuery(url, queryToInject) {
+  if (!url || (url[0] !== '.' && url[0] !== '/')) return url;
+  const pathname = url.replace(/[?#].*$/, '');
+  return pathname + '?' + queryToInject;
+}
+export class ErrorOverlay extends HTMLElement {}
+`);
+    });
+
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true, hmr: false },
+      server: { middlewareMode: true, hmr: false, watch: null },
       appType: 'spa',
     });
     app.use(vite.middlewares);

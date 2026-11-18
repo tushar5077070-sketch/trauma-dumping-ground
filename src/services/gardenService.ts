@@ -20,12 +20,64 @@ import {
   Story,
   SupportiveMessage,
 } from '../types/garden';
+import {
+  checkPlantedStoryLocal,
+  checkSupportiveReplyLocal,
+  moderatePublicContent,
+} from '../utils/contentModeration';
 
 const LOCAL_FALLBACK_KEY = 'tdg_local_stories_v1';
 const LOCAL_MESSAGES_KEY = 'tdg_local_messages_v1';
 const LAST_PLANT_TIMESTAMP_KEY = 'tdg_last_plant_ts';
 
 let isSeedingInProgress = false;
+
+// Per-page-load shuffle offset & permutation so every browser refresh assigns fresh stories to each flower in the meadow
+const SESSION_SHUFFLE_ORDER: number[] = (() => {
+  const indices = INITIAL_GARDEN_STORIES.map((_, i) => i);
+  for (let i = indices.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = indices[i];
+    indices[i] = indices[j];
+    indices[j] = tmp;
+  }
+  return indices;
+})();
+
+const SESSION_STORY_SLOT_MAP = new Map<
+  string,
+  {
+    positionX: number;
+    positionY: number;
+    scale: number;
+    flowerVariant: FlowerVariant;
+  }
+>();
+
+INITIAL_GARDEN_STORIES.forEach((story, idx) => {
+  const targetSlot = INITIAL_GARDEN_STORIES[SESSION_SHUFFLE_ORDER[idx]];
+  SESSION_STORY_SLOT_MAP.set(story.storyId, {
+    positionX: targetSlot.positionX,
+    positionY: targetSlot.positionY,
+    scale: targetSlot.scale,
+    flowerVariant: story.flowerVariant,
+  });
+});
+
+export function getInitialShuffledStories(): Story[] {
+  return SESSION_SHUFFLE_ORDER.map((shuffledIdx, idx) => {
+    const s = INITIAL_GARDEN_STORIES[shuffledIdx];
+    const slot = SESSION_STORY_SLOT_MAP.get(s.storyId);
+    return {
+      ...s,
+      positionX: slot ? slot.positionX : s.positionX,
+      positionY: slot ? slot.positionY : s.positionY,
+      scale: slot ? slot.scale : s.scale,
+      createdAt: new Date(Date.now() - (idx + 1) * 3600 * 1000 * 4),
+      updatedAt: new Date(Date.now() - (idx + 1) * 3600 * 1000 * 4),
+    };
+  });
+}
 
 function toDate(val: unknown): Date {
   if (val instanceof Timestamp) {
@@ -120,35 +172,50 @@ export function subscribeToApprovedStories(
       const loaded: Story[] = [];
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
+        const storyId = String(data.storyId || docSnap.id);
+        const content = String(data.content || '');
+        if (!checkPlantedStoryLocal(content).allowed) {
+          return;
+        }
+        const shuffledSlot = SESSION_STORY_SLOT_MAP.get(storyId);
         loaded.push({
-          storyId: String(data.storyId || docSnap.id),
+          storyId,
           anonymousId: String(data.anonymousId || 'Anonymous Soul #1048'),
-          content: String(data.content || ''),
+          content,
           seedType: (data.seedType as SeedType) || 'daisy',
-          flowerVariant: (data.flowerVariant as FlowerVariant) || 'pink-tulip',
+          flowerVariant:
+            (data.flowerVariant as FlowerVariant) || 'pink-tulip',
           contentWarning: String(data.contentWarning || ''),
           moderationStatus: 'approved',
           warmthCount: Number(data.warmthCount ?? 0),
           messageCount: Number(data.messageCount ?? 0),
-          positionX: Number(data.positionX ?? 50),
-          positionY: Number(data.positionY ?? 50),
-          scale: Number(data.scale ?? 1),
+          positionX: shuffledSlot
+            ? shuffledSlot.positionX
+            : Number(data.positionX ?? 50),
+          positionY: shuffledSlot
+            ? shuffledSlot.positionY
+            : Number(data.positionY ?? 50),
+          scale: shuffledSlot ? shuffledSlot.scale : Number(data.scale ?? 1),
           createdAt: toDate(data.createdAt),
           updatedAt: toDate(data.updatedAt),
         });
       });
 
       if (loaded.length > 0) {
-        loaded.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        // Order user-planted stories first, followed by the per-refresh shuffled seed order
+        const orderRank = new Map<string, number>();
+        SESSION_SHUFFLE_ORDER.forEach((storyIdx, rank) => {
+          orderRank.set(INITIAL_GARDEN_STORIES[storyIdx].storyId, rank + 1000);
+        });
+        loaded.sort((a, b) => {
+          const rankA = orderRank.get(a.storyId) ?? 0;
+          const rankB = orderRank.get(b.storyId) ?? 0;
+          if (rankA !== rankB) return rankA - rankB;
+          return b.createdAt.getTime() - a.createdAt.getTime();
+        });
         onUpdate(loaded, true);
       } else {
-        // While initial seed batch is committing, provide immediate meadow stories
-        const fallback = INITIAL_GARDEN_STORIES.map((s, idx) => ({
-          ...s,
-          createdAt: new Date(Date.now() - (idx + 1) * 3600 * 1000 * 5),
-          updatedAt: new Date(Date.now() - (idx + 1) * 3600 * 1000 * 5),
-        }));
-        onUpdate(fallback, true);
+        onUpdate(getInitialShuffledStories(), true);
       }
     },
     (error) => {
@@ -210,6 +277,18 @@ export async function plantNewStory(input: PlantStoryInput): Promise<Story> {
   const trimmedContent = input.content.trim().slice(0, 2000);
   if (trimmedContent.length < 5) {
     throw new Error('Please write at least a few words (minimum 5 characters) to plant your seed.');
+  }
+
+  // Deterministic + Gemini AI moderation check
+  const moderation = await moderatePublicContent({
+    text: trimmedContent,
+    contentType: 'story',
+  });
+  if (!moderation.allowed) {
+    throw new Error(
+      moderation.reason ||
+        'This story contains harmful or abusive language and cannot be planted.'
+    );
   }
 
   const cleanWarning = (input.contentWarning || '').trim().slice(0, 120);
@@ -342,6 +421,20 @@ export async function leaveSupportiveMessage(
     throw new Error('Please write a kind message of at least 2 characters.');
   }
 
+  // Enforce both instant deterministic safety filter AND server-side Gemini AI kindness moderation
+  const moderation = await moderatePublicContent({
+    text: cleanContent,
+    contentType: 'supportive_message',
+    storyContext: story.content,
+  });
+
+  if (!moderation.allowed) {
+    throw new Error(
+      moderation.reason ||
+        'Unsaid only allows gentle, supportive replies. Hurtful or judgmental words cannot be sent.'
+    );
+  }
+
   const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const anonymousId = generateKindGardenerId();
 
@@ -403,11 +496,16 @@ export function subscribeToStoryMessages(
       const list: SupportiveMessage[] = [];
       snapshot.forEach((docSnap) => {
         const d = docSnap.data();
+        const msgContent = String(d.content || '');
+        // Hide any previously submitted harmful or insulting messages (e.g., "pathetic")
+        if (!checkSupportiveReplyLocal(msgContent).allowed) {
+          return;
+        }
         list.push({
           messageId: String(d.messageId || docSnap.id),
           storyId: String(d.storyId || cleanStoryId),
           anonymousId: String(d.anonymousId || 'Kind Gardener #402'),
-          content: String(d.content || ''),
+          content: msgContent,
           moderationStatus: 'approved',
           createdAt: toDate(d.createdAt),
         });

@@ -30,7 +30,10 @@ import {
   SupportiveMessage,
   VoiceJournal,
 } from './types/garden';
-import { subscribeToApprovedStories } from './services/gardenService';
+import {
+  getInitialShuffledStories,
+  subscribeToApprovedStories,
+} from './services/gardenService';
 import {
   ensureUserAccountSynced,
   isVerifiedAdminUser,
@@ -68,11 +71,7 @@ import { InnerGardenModal } from './components/InnerGardenModal';
 
 export default function App() {
   const [stories, setStories] = useState<Story[]>(() =>
-    INITIAL_GARDEN_STORIES.map((s, idx) => ({
-      ...s,
-      createdAt: new Date(Date.now() - (idx + 1) * 3600 * 1000 * 4),
-      updatedAt: new Date(Date.now() - (idx + 1) * 3600 * 1000 * 4),
-    }))
+    getInitialShuffledStories()
   );
   const [selectedSeed, setSelectedSeed] = useState<SeedType>('daisy');
   const [activeStory, setActiveStory] = useState<Story | null>(null);

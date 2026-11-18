@@ -1,6 +1,6 @@
 {
-  "name": "Trauma Dumping Ground",
-  "description": "An anonymous, living digital flower garden where people can release heavy memories, plant seeds of healing, and read anonymous stories of resilience.",
-  "requestFramePermissions": [],
+  "name": "Unsaid",
+  "description": "Some feelings deserve a place. An anonymous, living digital flower garden where people can release heavy memories, plant seeds of healing, and read anonymous stories of resilience.",
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -576,7 +576,7 @@ Synthesize an empathetic, conversational ${periodTypeLabel} memory reflection ce
   if (!IS_PROD) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -590,7 +590,7 @@ Synthesize an empathetic, conversational ${periodTypeLabel} memory reflection ce
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(
-      `Trauma Dumping Ground server listening on http://0.0.0.0:${PORT}`
+      `Unsaid server listening on http://0.0.0.0:${PORT}`
     );
   });
 }

@@ -35,7 +35,7 @@ export const InfoModals: React.FC<InfoModalProps> = ({
             </p>
             <h2 className="font-editorial text-2xl sm:text-4xl font-semibold text-slate-900 mt-0.5">
               {activeModal === 'about'
-                ? 'Every story deserves a place to exist.'
+                ? 'Some feelings deserve a place.'
                 : 'How the Garden Works'}
             </h2>
           </div>
@@ -55,7 +55,7 @@ export const InfoModals: React.FC<InfoModalProps> = ({
           {activeModal === 'about' ? (
             <>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                <strong>Trauma Dumping Ground</strong> is an anonymous emotional sanctuary where heavy memories, unspoken grief, and personal turning points can be set down and transformed into a living digital meadow.
+                <strong>Unsaid</strong> is an anonymous emotional sanctuary where heavy memories, unspoken grief, and personal turning points can be set down and transformed into a living digital meadow.
               </p>
 
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">

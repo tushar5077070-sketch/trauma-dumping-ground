@@ -13,12 +13,16 @@ import {
   LogIn,
   ShieldCheck,
   BookHeart,
+  Sprout,
 } from 'lucide-react';
 import {
   DEFAULT_GARDEN_CUSTOMISATION,
   DiaryEntry,
   GardenCustomisationSettings,
   INITIAL_GARDEN_STORIES,
+  InnerJournalEntry,
+  InnerPrivacyPrefs,
+  InnerReflectionMemory,
   SavedMemory,
   SecretGardenMembership,
   SeedType,
@@ -46,6 +50,11 @@ import {
   subscribeToSecretGardenMembership,
   subscribeToVoiceJournals,
 } from './services/secretGardenService';
+import {
+  subscribeToInnerJournalEntries,
+  subscribeToInnerPrivacyPrefs,
+  subscribeToInnerReflections,
+} from './services/innerGardenService';
 import { soundscape } from './utils/soundscape';
 import { LivingGardenCanvas } from './components/LivingGardenCanvas';
 import { WriteStoryModal } from './components/WriteStoryModal';
@@ -55,6 +64,7 @@ import { AccountModal } from './components/AccountModal';
 import { AdminBackendModal } from './components/AdminBackendModal';
 import { MySpaceModal } from './components/MySpaceModal';
 import { SecretGardenUpgradeModal } from './components/SecretGardenUpgradeModal';
+import { InnerGardenModal } from './components/InnerGardenModal';
 
 export default function App() {
   const [stories, setStories] = useState<Story[]>(() =>
@@ -79,6 +89,7 @@ export default function App() {
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [isMySpaceOpen, setIsMySpaceOpen] = useState(false);
+  const [isInnerGardenOpen, setIsInnerGardenOpen] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
   const [upgradeFocusFeature, setUpgradeFocusFeature] = useState<string | null>(
     null
@@ -89,6 +100,12 @@ export default function App() {
   const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
   const [voiceJournals, setVoiceJournals] = useState<VoiceJournal[]>([]);
   const [memories, setMemories] = useState<SavedMemory[]>([]);
+  const [innerEntries, setInnerEntries] = useState<InnerJournalEntry[]>([]);
+  const [innerReflections, setInnerReflections] = useState<
+    InnerReflectionMemory[]
+  >([]);
+  const [innerPrivacyPrefs, setInnerPrivacyPrefs] =
+    useState<InnerPrivacyPrefs | null>(null);
   const [localCustomisation, setLocalCustomisation] =
     useState<GardenCustomisationSettings>(() => loadLocalGardenCustomisation());
 
@@ -123,6 +140,9 @@ export default function App() {
       setDiaryEntries([]);
       setVoiceJournals([]);
       setMemories([]);
+      setInnerEntries([]);
+      setInnerReflections([]);
+      setInnerPrivacyPrefs(null);
       return;
     }
 
@@ -152,12 +172,30 @@ export default function App() {
       setMemories,
       () => {}
     );
+    const unsubInnerEntries = subscribeToInnerJournalEntries(
+      currentUser.uid,
+      setInnerEntries,
+      () => {}
+    );
+    const unsubInnerReflections = subscribeToInnerReflections(
+      currentUser.uid,
+      setInnerReflections,
+      () => {}
+    );
+    const unsubInnerPrefs = subscribeToInnerPrivacyPrefs(
+      currentUser.uid,
+      setInnerPrivacyPrefs,
+      () => {}
+    );
 
     return () => {
       unsubMembership();
       unsubDiary();
       unsubVoice();
       unsubMemories();
+      unsubInnerEntries();
+      unsubInnerReflections();
+      unsubInnerPrefs();
     };
   }, [currentUser]);
 
@@ -309,10 +347,10 @@ export default function App() {
                   setIsWriteModalOpen(false);
                   setActiveInfoModal(null);
                 }}
-                className="inline-flex items-center gap-1.5 sm:gap-2 font-editorial text-lg sm:text-base md:text-lg lg:text-2xl font-semibold tracking-tight text-white drop-shadow-sm whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1.5 sm:gap-2 font-editorial text-xl sm:text-xl md:text-2xl lg:text-3xl font-semibold tracking-tight text-white drop-shadow-sm whitespace-nowrap shrink-0"
               >
                 <Flower2 className="w-4 h-4 sm:w-4.5 sm:h-4.5 lg:w-5 lg:h-5 text-pink-100 shrink-0" />
-                <span>Trauma Dumping Ground</span>
+                <span>Unsaid</span>
               </a>
 
               {/* Mobile-only Plant CTA on Row 1 right */}
@@ -344,6 +382,15 @@ export default function App() {
                   className="py-1 hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
                 >
                   How It Works
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsInnerGardenOpen(true)}
+                  className="inline-flex items-center gap-1.5 py-1 px-2 sm:px-2.5 rounded-full bg-emerald-100/22 hover:bg-emerald-100/35 border border-emerald-100/45 text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
+                  title="Open your private My Inner Garden"
+                >
+                  <Sprout className="w-3.5 h-3.5 text-emerald-100 shrink-0" />
+                  <span>My Inner Garden</span>
                 </button>
                 <button
                   type="button"
@@ -449,7 +496,7 @@ export default function App() {
                 textShadow: '0 4px 24px rgba(32, 92, 138, 0.35)',
               }}
             >
-              Every flower holds a story.
+              Some feelings deserve a place.
             </h1>
 
             <p
@@ -559,6 +606,16 @@ export default function App() {
           setIsUpgradeModalOpen(false);
           setUpgradeFocusFeature(null);
         }}
+      />
+
+      {/* 11. My Inner Garden — AI Voice Journaling, Memory & Emotional Patterns */}
+      <InnerGardenModal
+        isOpen={isInnerGardenOpen}
+        currentUser={currentUser}
+        entries={innerEntries}
+        reflections={innerReflections}
+        prefs={innerPrivacyPrefs}
+        onClose={() => setIsInnerGardenOpen(false)}
       />
     </div>
   );

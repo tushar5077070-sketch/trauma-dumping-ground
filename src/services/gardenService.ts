@@ -284,6 +284,45 @@ export function subscribeToOwnPlantedStories(
 }
 
 /**
+ * One-shot fetch of the signed-in user's private planted story ownership receipts.
+ * Used when opening the Account modal so the list is always fresh and never stale.
+ */
+export async function fetchOwnPlantedStories(
+  userId: string
+): Promise<PlantedStoryReceipt[]> {
+  const cleanUid = userId.trim();
+  if (!cleanUid || !/^[a-zA-Z0-9_-]{1,64}$/.test(cleanUid)) {
+    return [];
+  }
+
+  const path = `userAccounts/${cleanUid}/plantedStories`;
+  const q = query(
+    collection(db, 'userAccounts', cleanUid, 'plantedStories'),
+    where('userId', '==', cleanUid)
+  );
+
+  try {
+    const snapshot = await getDocs(q);
+    const list: PlantedStoryReceipt[] = [];
+    snapshot.forEach((docSnap) => {
+      const d = docSnap.data();
+      list.push({
+        storyId: String(d.storyId || docSnap.id),
+        userId: String(d.userId || cleanUid),
+        seedType: (d.seedType as SeedType) || 'daisy',
+        flowerVariant: (d.flowerVariant as FlowerVariant) || 'pink-tulip',
+        preview: String(d.preview || ''),
+        createdAt: toDate(d.createdAt),
+      });
+    });
+    list.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return list;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path);
+  }
+}
+
+/**
  * Allows the original signed-in author to permanently remove their own planted story
  * from the meadow and Firestore, verified by their private plantedStories receipt.
  */

@@ -33,7 +33,10 @@ import {
   subscribeToOwnSubscriptions,
   subscribeToOwnUserAccount,
 } from '../services/authAccountService';
-import { deleteOwnStory } from '../services/gardenService';
+import {
+  deleteOwnStory,
+  fetchOwnPlantedStories,
+} from '../services/gardenService';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -43,8 +46,9 @@ interface AccountModalProps {
   stories?: Story[];
   onSelectStory?: (story: Story) => void;
   onStoryDeleted?: (storyId: string) => void;
+  onSyncOwnPlantedStories?: (receipts: PlantedStoryReceipt[]) => void;
   onClose: () => void;
-  onOpenAdminConsole: () => void;
+  onOpenAdminConsole: (initialTab?: 'users' | 'stories') => void;
   onOpenMySpace?: () => void;
 }
 
@@ -78,6 +82,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   stories = [],
   onSelectStory,
   onStoryDeleted,
+  onSyncOwnPlantedStories,
   onClose,
   onOpenAdminConsole,
   onOpenMySpace,
@@ -94,14 +99,34 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   );
   const [removingStoryId, setRemovingStoryId] = useState<string | null>(null);
   const [removeStoryError, setRemoveStoryError] = useState<string | null>(null);
+  const [isRefreshingStories, setIsRefreshingStories] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !currentUser) {
       setAccount(null);
       setOwnEvents([]);
       setOwnSubscriptions([]);
+      setConfirmRemoveStoryId(null);
+      setRemoveStoryError(null);
       return;
     }
+
+    let cancelled = false;
+    setIsRefreshingStories(true);
+    fetchOwnPlantedStories(currentUser.uid)
+      .then((fresh) => {
+        if (!cancelled) {
+          onSyncOwnPlantedStories?.(fresh);
+        }
+      })
+      .catch(() => {
+        // Keep existing live subscription state
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsRefreshingStories(false);
+        }
+      });
 
     const unsubAccount = subscribeToOwnUserAccount(
       currentUser.uid,
@@ -120,11 +145,12 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     );
 
     return () => {
+      cancelled = true;
       unsubAccount();
       unsubEvents();
       unsubSubs();
     };
-  }, [isOpen, currentUser]);
+  }, [isOpen, currentUser, onSyncOwnPlantedStories]);
 
   if (!isOpen) return null;
 
@@ -410,7 +436,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     My Planted Stories ({ownPlantedStories.length})
                   </span>
                   <span className="text-[10px] font-medium text-slate-500">
-                    Visible only to you
+                    {isRefreshingStories ? 'Syncing...' : 'Visible only to you'}
                   </span>
                 </div>
 
@@ -422,11 +448,31 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 )}
 
                 {ownPlantedStories.length === 0 ? (
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Stories you plant in the meadow appear privately here so you can revisit or remove your own flower anytime while remaining completely anonymous to everyone else.
-                  </p>
-                ) : (
                   <div className="space-y-2">
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Every new story you plant while signed in appears privately here with a <strong className="text-slate-800">Remove Story</strong> button so you can delete it anytime while staying 100% anonymous in the meadow.
+                    </p>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      Note: Stories planted before self-removal was added were saved with zero account link to protect anonymity, so they cannot be matched to your account automatically.
+                    </p>
+                    {isAdmin && stories.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onOpenAdminConsole('stories');
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-xs font-medium text-rose-700 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>
+                          Admin: Manage & Remove Any Live Story ({stories.length})
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
                     {ownPlantedStories.map((receipt) => {
                       const liveStory = stories.find(
                         (s) => s.storyId === receipt.storyId
@@ -444,9 +490,20 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                           className="p-3 rounded-xl bg-white border border-slate-200/80 space-y-2"
                         >
                           <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
-                            <span className="font-semibold text-slate-700">
-                              {seedMeta?.name || receipt.seedType} Seed
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold text-slate-700">
+                                {seedMeta?.name || receipt.seedType} Seed
+                              </span>
+                              <span
+                                className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${
+                                  liveStory
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : 'bg-slate-100 text-slate-500 border border-slate-200'
+                                }`}
+                              >
+                                {liveStory ? 'Live' : 'Already Removed'}
+                              </span>
+                            </div>
                             <span className="tabular-nums">
                               {formatDateTime(receipt.createdAt)}
                             </span>
@@ -454,7 +511,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                           <p className="text-xs text-slate-700 leading-relaxed line-clamp-2">
                             “{liveStory?.content || receipt.preview}”
                           </p>
-                          <div className="flex items-center justify-end gap-2 pt-0.5">
+                          <div className="flex flex-wrap items-center justify-end gap-2 pt-0.5">
                             {liveStory && onSelectStory && (
                               <button
                                 type="button"
@@ -462,9 +519,9 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                                   onClose();
                                   onSelectStory(liveStory);
                                 }}
-                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-[11px] font-medium text-slate-700 cursor-pointer"
+                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-[11px] font-medium text-slate-700 cursor-pointer"
                               >
-                                Open
+                                View Flower
                               </button>
                             )}
                             {isConfirming && (
@@ -472,7 +529,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                                 type="button"
                                 onClick={() => setConfirmRemoveStoryId(null)}
                                 disabled={isRemoving}
-                                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+                                className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-[11px] font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
                               >
                                 Cancel
                               </button>
@@ -483,25 +540,43 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                                 handleRemoveOwnStory(receipt.storyId)
                               }
                               disabled={isRemoving}
-                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-medium cursor-pointer transition-colors disabled:opacity-50 ${
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[11px] font-medium cursor-pointer transition-colors disabled:opacity-50 ${
                                 isConfirming
                                   ? 'bg-rose-600 text-white border-rose-700'
                                   : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
                               }`}
                             >
-                              <Trash2 className="w-3 h-3" />
+                              <Trash2 className="w-3.5 h-3.5" />
                               <span>
                                 {isRemoving
                                   ? 'Removing...'
                                   : isConfirming
                                   ? 'Confirm Remove'
-                                  : 'Remove'}
+                                  : liveStory
+                                  ? 'Remove Story'
+                                  : 'Clear Record'}
                               </span>
                             </button>
                           </div>
                         </div>
                       );
                     })}
+
+                    {isAdmin && stories.length > ownPlantedStories.length && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          onOpenAdminConsole('stories');
+                        }}
+                        className="w-full py-2 px-3 rounded-xl bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-[11px] font-medium text-slate-700 hover:text-rose-700 inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>
+                          Admin: Manage All {stories.length} Live Meadow Stories
+                        </span>
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

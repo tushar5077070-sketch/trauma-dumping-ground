@@ -51,11 +51,12 @@ interface AdminBackendModalProps {
   isOpen: boolean;
   currentUser: User | null;
   stories: Story[];
+  initialTab?: AdminTab;
   onStoryDeleted?: (storyId: string) => void;
   onClose: () => void;
 }
 
-type AdminTab = 'users' | 'logins' | 'subscriptions' | 'stories' | 'reports';
+export type AdminTab = 'users' | 'logins' | 'subscriptions' | 'stories' | 'reports';
 
 function formatDateTime(date: Date): string {
   return date.toLocaleString(undefined, {
@@ -87,10 +88,11 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
   isOpen,
   currentUser,
   stories,
+  initialTab = 'users',
   onStoryDeleted,
   onClose,
 }) => {
-  const [activeTab, setActiveTab] = useState<AdminTab>('users');
+  const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [loginEvents, setLoginEvents] = useState<LoginEvent[]>([]);
   const [subscriptions, setSubscriptions] = useState<SubscriptionRecord[]>([]);
@@ -134,6 +136,12 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
   );
 
   const isAdmin = isVerifiedAdminUser(currentUser);
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   useEffect(() => {
     if (!isOpen || !isAdmin) return;

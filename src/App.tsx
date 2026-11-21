@@ -90,6 +90,9 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [adminInitialTab, setAdminInitialTab] = useState<'users' | 'stories'>(
+    'users'
+  );
   const [isMySpaceOpen, setIsMySpaceOpen] = useState(false);
   const [isInnerGardenOpen, setIsInnerGardenOpen] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
@@ -243,18 +246,37 @@ export default function App() {
     setActiveStory(chosen);
   }, [stories, activeStory]);
 
-  const handleStoryPlanted = useCallback((newStory: Story) => {
-    setStories((prev) => {
-      if (prev.some((s) => s.storyId === newStory.storyId)) return prev;
-      return [newStory, ...prev];
-    });
-    setHighlightedStoryId(newStory.storyId);
-    setTimeout(() => {
-      setHighlightedStoryId((curr) =>
-        curr === newStory.storyId ? null : curr
-      );
-    }, 14000);
-  }, []);
+  const handleStoryPlanted = useCallback(
+    (newStory: Story) => {
+      setStories((prev) => {
+        if (prev.some((s) => s.storyId === newStory.storyId)) return prev;
+        return [newStory, ...prev];
+      });
+      if (currentUser) {
+        setOwnPlantedStories((prev) => {
+          if (prev.some((r) => r.storyId === newStory.storyId)) return prev;
+          return [
+            {
+              storyId: newStory.storyId,
+              userId: currentUser.uid,
+              seedType: newStory.seedType,
+              flowerVariant: newStory.flowerVariant,
+              preview: newStory.content.slice(0, 140),
+              createdAt: newStory.createdAt,
+            },
+            ...prev,
+          ];
+        });
+      }
+      setHighlightedStoryId(newStory.storyId);
+      setTimeout(() => {
+        setHighlightedStoryId((curr) =>
+          curr === newStory.storyId ? null : curr
+        );
+      }, 14000);
+    },
+    [currentUser]
+  );
 
   const handleLocalStoryWarmthIncrement = useCallback((storyId: string) => {
     setStories((prev) =>
@@ -266,6 +288,7 @@ export default function App() {
 
   const handleStoryDeleted = useCallback((storyId: string) => {
     setStories((prev) => prev.filter((s) => s.storyId !== storyId));
+    setOwnPlantedStories((prev) => prev.filter((r) => r.storyId !== storyId));
     setActiveStory((curr) => (curr?.storyId === storyId ? null : curr));
   }, []);
 
@@ -731,8 +754,12 @@ export default function App() {
         stories={stories}
         onSelectStory={handleSelectStory}
         onStoryDeleted={handleStoryDeleted}
+        onSyncOwnPlantedStories={setOwnPlantedStories}
         onClose={() => setIsAccountModalOpen(false)}
-        onOpenAdminConsole={() => setIsAdminModalOpen(true)}
+        onOpenAdminConsole={(tab = 'users') => {
+          setAdminInitialTab(tab);
+          setIsAdminModalOpen(true);
+        }}
         onOpenMySpace={() => setIsMySpaceOpen(true)}
       />
 
@@ -741,8 +768,12 @@ export default function App() {
         isOpen={isAdminModalOpen}
         currentUser={currentUser}
         stories={stories}
+        initialTab={adminInitialTab}
         onStoryDeleted={handleStoryDeleted}
-        onClose={() => setIsAdminModalOpen(false)}
+        onClose={() => {
+          setIsAdminModalOpen(false);
+          setAdminInitialTab('users');
+        }}
       />
 
       {/* 9. My Space Personal Sanctuary Dashboard & Five Premium Features */}

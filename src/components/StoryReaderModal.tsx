@@ -283,9 +283,9 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
                     : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
                 }`}
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">
-                  {isAuthor ? 'Remove My Story' : 'Delete'}
+                <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                <span>
+                  {isAuthor ? 'Remove' : 'Delete'}
                 </span>
               </button>
             )}

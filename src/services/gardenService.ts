@@ -359,9 +359,9 @@ export async function plantNewStory(input: PlantStoryInput): Promise<Story> {
     );
   }
 
-  // Rate limiting check (minimum 6 seconds between plantings)
+  // Rate limiting check (minimum 2.5 seconds between plantings)
   const lastTs = Number(localStorage.getItem(LAST_PLANT_TIMESTAMP_KEY) || 0);
-  if (Date.now() - lastTs < 6000) {
+  if (Date.now() - lastTs < 2500) {
     throw new Error('Please take a gentle breath before planting another seed.');
   }
 

@@ -10,12 +10,19 @@ const __dirname = path.dirname(__filename);
 const PORT = Number(process.env.PORT || 3000);
 const IS_PROD = process.env.NODE_ENV === 'production';
 
+let cachedGeminiClient: GoogleGenAI | null = null;
+let cachedGeminiKey = '';
+
 function getGeminiClient(): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
     return null;
   }
-  return new GoogleGenAI({
+  if (cachedGeminiClient && cachedGeminiKey === apiKey) {
+    return cachedGeminiClient;
+  }
+  cachedGeminiKey = apiKey;
+  cachedGeminiClient = new GoogleGenAI({
     apiKey,
     httpOptions: {
       headers: {
@@ -23,6 +30,7 @@ function getGeminiClient(): GoogleGenAI | null {
       },
     },
   });
+  return cachedGeminiClient;
 }
 
 function handleGeminiRouteError(
@@ -634,54 +642,50 @@ Synthesize an empathetic, conversational ${periodTypeLabel} memory reflection ce
     try {
       const isReply = contentType === 'supportive_message';
       const prompt = isReply
-        ? `Evaluate whether this anonymous reply left on a vulnerable person's emotional story is safe, kind, and supportive.
-Original story context (optional): """${(storyContext || '').slice(0, 500)}"""
-Proposed reply: """${cleanText}"""`
-        : `Evaluate whether this anonymous personal story being planted in an emotional healing meadow is safe to publish (allow honest personal grief, trauma, sadness, or struggle; block hate speech, targeted harassment, bullying, spam, or encouragement of self-harm).
-Proposed story: """${cleanText}"""`;
+        ? `Story: """${(storyContext || '').slice(0, 260)}"""\nReply: """${cleanText}"""`
+        : `Story: """${cleanText.slice(0, 1200)}"""`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-4-hydrogen',
+      const aiRequest = ai.models.generateContent({
+        model: 'gemini-3.1-flash-lite',
         contents: prompt,
         config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
           systemInstruction: isReply
-            ? `You are the compassionate safety guardian for Unsaid, an emotional sanctuary.
-When someone clicks "Leave a kind message", their reply MUST be genuinely kind, empathetic, or comforting.
-Set allowed=false if the reply contains ANY of the following:
-- Insults, name-calling, or demeaning adjectives (e.g., "pathetic", "weak", "loser", "cringe", "stupid", "dramatic", "crybaby")
-- Sarcasm, mockery, laughing at the author, or passive-aggressive hostility
-- Dismissiveness or invalidation (e.g., "get over it", "nobody cares", "grow up", "stop complaining", "it's your fault")
-- Profanity, slurs, threats, or encouragement of self-harm
-- Unhelpful criticism or judgment
-If allowed=false, provide a gentle, clear 1-sentence reason explaining that only supportive, compassionate words may be left on a flower.`
-            : `You are the safety guardian for Unsaid. Allow personal stories about grief, heartbreak, anxiety, family conflict, burnout, and emotional pain. Set allowed=false ONLY if the text attacks/bullies others, contains hate speech/slurs, promotes self-harm/violence, or is obvious spam/gibberish.`,
+            ? 'Safety check for a kind reply on an emotional story. Return allowed=false ONLY if insulting, mocking, dismissive, profane, hostile, or encouraging harm; else allowed=true with empty reason. If blocked, give a brief gentle 1-sentence reason.'
+            : 'Safety check for an anonymous personal emotional story. Allow grief, sadness, trauma, heartbreak, anxiety, and burnout. Return allowed=false ONLY for hate speech/slurs, targeted bullying/harassment, encouraging self-harm/violence, or obvious spam; else allowed=true with empty reason.',
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
             properties: {
               allowed: { type: Type.BOOLEAN },
-              category: { type: Type.STRING },
               reason: { type: Type.STRING },
             },
-            required: ['allowed', 'category', 'reason'],
+            required: ['allowed', 'reason'],
           },
         },
       });
 
+      const timeoutPromise = new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), 2200)
+      );
+
+      const response = await Promise.race([aiRequest, timeoutPromise]);
+      if (!response) {
+        return res.json({ allowed: true, category: 'clean', reason: '' });
+      }
+
       const parsed = JSON.parse((response.text ?? '{}').trim()) as {
         allowed?: boolean;
-        category?: string;
         reason?: string;
       };
 
       return res.json({
         allowed: parsed.allowed !== false,
-        category: String(parsed.category || 'clean'),
+        category: parsed.allowed === false ? 'unkind_tone' : 'clean',
         reason: String(parsed.reason || ''),
       });
     } catch {
-      return res.json({ allowed: true, category: 'clean' });
+      return res.json({ allowed: true, category: 'clean', reason: '' });
     }
   });
 

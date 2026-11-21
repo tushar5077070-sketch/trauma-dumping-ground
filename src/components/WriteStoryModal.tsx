@@ -471,6 +471,13 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
                 <p className="text-xs text-slate-500 mt-1.5">
                   Planting {currentSeed.name} · Anonymous bloom
                 </p>
+                <button
+                  type="button"
+                  onClick={handleReturnToGarden}
+                  className="mt-2.5 text-[11px] font-medium text-slate-500 hover:text-slate-800 underline underline-offset-4 transition-colors cursor-pointer"
+                >
+                  Return to Garden now
+                </button>
               </>
             ) : (
               <div className="space-y-2">

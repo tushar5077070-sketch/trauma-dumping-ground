@@ -317,15 +317,18 @@ export async function moderatePublicContent(params: {
     return localResult;
   }
 
-  // Step 2: Server-side Gemini AI moderation check
+  // Step 2: Fast server-side Gemini AI moderation check (hard 2.5s cap so planting never stalls)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 2500);
   try {
     const res = await fetch('/api/ai/moderate-content', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         text: params.text,
         contentType: params.contentType,
-        storyContext: (params.storyContext || '').slice(0, 600),
+        storyContext: (params.storyContext || '').slice(0, 300),
       }),
     });
 
@@ -346,7 +349,9 @@ export async function moderatePublicContent(params: {
       }
     }
   } catch {
-    // If network/offline error occurs, local deterministic check has already enforced safety
+    // If timeout or network error occurs, local deterministic check has already enforced safety
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   return { allowed: true, category: 'clean' };

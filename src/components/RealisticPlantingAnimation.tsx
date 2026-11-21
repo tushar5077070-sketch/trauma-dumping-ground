@@ -744,13 +744,18 @@ export const RealisticPlantingAnimation: React.FC<
     };
 
     const render = (now: number) => {
-      const dt = Math.min(0.05, (now - prevPerf) / 1000);
+      const rawDt = Math.min(0.05, (now - prevPerf) / 1000);
+      const dt = rawDt * 1.45;
       prevPerf = now;
 
-      const elapsedMs = prefersReducedMotion ? 5600 : now - startPerf;
-      const tSec = elapsedMs * 0.001;
+      const GROWTH_SPEED = 2.7;
+      const realSec = (now - startPerf) * 0.001;
+      const elapsedMs = prefersReducedMotion
+        ? 5600
+        : (now - startPerf) * GROWTH_SPEED;
+      const tSec = realSec;
 
-      // Update React caption phase synchronously from simulation clock
+      // Update React caption phase synchronously from accelerated simulation clock (~2.0s full bloom)
       if (elapsedMs < 900) {
         emitPhase('seed-falling');
       } else if (elapsedMs < 1850) {
@@ -798,7 +803,7 @@ export const RealisticPlantingAnimation: React.FC<
       ctx.lineTo(0, groundY + 12);
       ctx.fill();
 
-      // Gentle breeze formula active throughout
+      // Gentle breeze formula active throughout at natural pace
       const breeze = prefersReducedMotion
         ? 0
         : Math.sin(tSec * 1.85) * 0.075 + Math.cos(tSec * 0.9) * 0.03;

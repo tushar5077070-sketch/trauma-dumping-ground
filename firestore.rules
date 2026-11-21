@@ -719,7 +719,9 @@ service cloud.firestore {
       allow get: if isValidId(storyId) && (existing().moderationStatus == 'approved' || isAdmin());
       allow list: if existing().moderationStatus == 'approved' || isAdmin();
 
-      allow create: if isValidId(storyId) &&
+      allow create: if isSignedIn() &&
+        request.auth.token.email_verified == true &&
+        isValidId(storyId) &&
         isValidStory(incoming()) &&
         incoming().storyId == storyId &&
         incoming().moderationStatus == 'approved' &&

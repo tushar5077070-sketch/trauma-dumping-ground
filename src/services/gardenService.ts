@@ -10,7 +10,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../firebase';
 import {
   AMBIENT_MEADOW_FLOWERS,
   AmbientMeadowFlower,
@@ -180,6 +180,12 @@ export interface PlantStoryInput {
 }
 
 export async function plantNewStory(input: PlantStoryInput): Promise<Story> {
+  if (!auth.currentUser) {
+    throw new Error(
+      'Please sign in with Google before planting a seed in the meadow.'
+    );
+  }
+
   // Rate limiting check (minimum 6 seconds between plantings)
   const lastTs = Number(localStorage.getItem(LAST_PLANT_TIMESTAMP_KEY) || 0);
   if (Date.now() - lastTs < 6000) {

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { X, ShieldCheck, AlertCircle, Sprout, Check } from 'lucide-react';
+import { User } from 'firebase/auth';
+import { X, ShieldCheck, AlertCircle, Sprout, Check, LogIn } from 'lucide-react';
 import {
   AmbientMeadowFlower,
   SEED_OPTIONS,
@@ -10,6 +11,7 @@ import {
   pickFlowerVariantForSeed,
   plantNewStory,
 } from '../services/gardenService';
+import { signInWithGoogleAndRecord } from '../services/authAccountService';
 import { soundscape } from '../utils/soundscape';
 import { SeedIconIllustration } from './FlowerIllustration';
 import {
@@ -19,6 +21,7 @@ import {
 
 interface WriteStoryModalProps {
   isOpen: boolean;
+  currentUser: User | null;
   selectedSeed: SeedType;
   onSelectSeed: (seed: SeedType) => void;
   existingStories: Story[];
@@ -29,6 +32,7 @@ interface WriteStoryModalProps {
 
 export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
   isOpen,
+  currentUser,
   selectedSeed,
   onSelectSeed,
   existingStories,
@@ -41,6 +45,8 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
   const [showContentWarningInput, setShowContentWarningInput] = useState(false);
   const [anonymousConfirmed, setAnonymousConfirmed] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isSigningIn, setIsSigningIn] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [phase, setPhase] = useState<PlantingPhase>('writing');
   const [plantedStory, setPlantedStory] = useState<Story | null>(null);
@@ -49,9 +55,18 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
     if (isOpen) {
       setPhase('writing');
       setErrorMsg(null);
+      setAuthError(null);
+      setIsSigningIn(false);
       setIsSubmitting(false);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (currentUser) {
+      setAuthError(null);
+      setIsSigningIn(false);
+    }
+  }, [currentUser]);
 
   if (!isOpen) return null;
 
@@ -60,9 +75,39 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
   const charCount = content.length;
   const maxChars = 2000;
 
+  const handleGoogleSignIn = async () => {
+    setAuthError(null);
+    setIsSigningIn(true);
+    try {
+      await signInWithGoogleAndRecord();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('popup-closed-by-user')) {
+        setAuthError(
+          'Sign-in was cancelled. You can try again whenever you are ready.'
+        );
+      } else if (msg.includes('popup-blocked')) {
+        setAuthError(
+          'Your browser blocked the sign-in popup. Please allow popups and try again.'
+        );
+      } else {
+        setAuthError('Unable to sign in right now. Please try again.');
+      }
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
+
   const handlePlantSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+
+    if (!currentUser) {
+      setErrorMsg(
+        'Please sign in with Google before planting a seed in the meadow.'
+      );
+      return;
+    }
 
     if (content.trim().length < 5) {
       setErrorMsg(
@@ -122,7 +167,81 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
       aria-labelledby="write-story-heading"
       className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-6 bg-slate-950/35 backdrop-blur-md transition-opacity"
     >
-      {phase === 'writing' ? (
+      {phase === 'writing' && !currentUser ? (
+        <div className="relative w-full max-w-lg rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xl shadow-2xl border border-white/80 overflow-hidden">
+          <div className="flex items-start justify-between gap-4 px-5 sm:px-7 pt-5 sm:pt-6 pb-4 border-b border-slate-200/60">
+            <div>
+              <p className="text-[11px] sm:text-xs font-medium text-emerald-700">
+                Sign In Required · Your Story Stays 100% Anonymous
+              </p>
+              <h2
+                id="write-story-heading"
+                className="font-editorial text-2xl sm:text-3xl font-semibold text-slate-900 mt-0.5 tracking-tight"
+              >
+                Sign in to plant your seed
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close sign in dialog"
+              className="p-1.5 sm:p-2 rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="px-5 sm:px-7 py-5 sm:py-6 space-y-4">
+            <p className="text-sm text-slate-600 leading-relaxed">
+              To keep Unsaid safe, gentle, and free from spam, please sign in with Google before planting a seed in the meadow.
+            </p>
+
+            <div className="flex items-start gap-3 p-3.5 rounded-2xl bg-emerald-50/75 border border-emerald-200/80">
+              <ShieldCheck className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+              <div className="text-xs text-slate-700 leading-relaxed">
+                <p className="font-semibold text-slate-900">
+                  Your flower stays completely anonymous
+                </p>
+                <p className="mt-0.5">
+                  Signing in only unlocks planting. Your name, email, and profile are never saved on your story or shown anywhere in the garden.
+                </p>
+              </div>
+            </div>
+
+            {authError && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{authError}</span>
+              </div>
+            )}
+
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSigningIn}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-medium text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isSigningIn}
+                className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-medium flex items-center justify-center gap-2 shadow-sm transition-colors cursor-pointer"
+              >
+                <LogIn className="w-3.5 h-3.5 text-emerald-300" />
+                <span>
+                  {isSigningIn
+                    ? 'Signing in with Google...'
+                    : 'Continue with Google'}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : phase === 'writing' ? (
         <form
           onSubmit={handlePlantSubmit}
           className="relative w-full max-w-2xl rounded-2xl sm:rounded-3xl bg-white/95 backdrop-blur-xl shadow-2xl border border-white/80 max-h-[94dvh] flex flex-col overflow-hidden"
@@ -290,7 +409,7 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   Anonymous Sanctuary Promise
                 </span>
-                Your story will be planted completely anonymously — with no username, profile, or tracking ID ever shown. No name, email, or personal identity is ever collected or displayed.
+                Your story will be planted completely anonymously — with no username, profile, or tracking ID ever attached or shown. Your Google account is never linked to or displayed on your flower.
               </div>
             </label>
 

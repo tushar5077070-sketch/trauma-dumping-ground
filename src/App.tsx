@@ -674,6 +674,7 @@ export default function App() {
       {/* 5. Write Your Story & Planting Animation Modal */}
       <WriteStoryModal
         isOpen={isWriteModalOpen}
+        currentUser={currentUser}
         selectedSeed={selectedSeed}
         onSelectSeed={setSelectedSeed}
         existingStories={stories}

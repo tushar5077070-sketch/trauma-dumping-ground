@@ -10,12 +10,17 @@ import {
   Monitor,
   AlertCircle,
   Lock,
+  Flower2,
+  Trash2,
 } from 'lucide-react';
 import {
   ALL_PREMIUM_FEATURES_FREE_FOR_NOW,
   LoginEvent,
+  PlantedStoryReceipt,
   SECRET_GARDEN_PLANS,
+  SEED_OPTIONS,
   SecretGardenMembership,
+  Story,
   SUBSCRIPTION_PLAN_CATALOG,
   SubscriptionRecord,
   UserAccount,
@@ -28,11 +33,16 @@ import {
   subscribeToOwnSubscriptions,
   subscribeToOwnUserAccount,
 } from '../services/authAccountService';
+import { deleteOwnStory } from '../services/gardenService';
 
 interface AccountModalProps {
   isOpen: boolean;
   currentUser: User | null;
   secretGardenMembership?: SecretGardenMembership | null;
+  ownPlantedStories?: PlantedStoryReceipt[];
+  stories?: Story[];
+  onSelectStory?: (story: Story) => void;
+  onStoryDeleted?: (storyId: string) => void;
   onClose: () => void;
   onOpenAdminConsole: () => void;
   onOpenMySpace?: () => void;
@@ -64,6 +74,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   isOpen,
   currentUser,
   secretGardenMembership,
+  ownPlantedStories = [],
+  stories = [],
+  onSelectStory,
+  onStoryDeleted,
   onClose,
   onOpenAdminConsole,
   onOpenMySpace,
@@ -75,6 +89,11 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   );
   const [isLoadingAuth, setIsLoadingAuth] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [confirmRemoveStoryId, setConfirmRemoveStoryId] = useState<string | null>(
+    null
+  );
+  const [removingStoryId, setRemovingStoryId] = useState<string | null>(null);
+  const [removeStoryError, setRemoveStoryError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen || !currentUser) {
@@ -147,6 +166,27 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       onClose();
     } finally {
       setIsLoadingAuth(false);
+    }
+  };
+
+  const handleRemoveOwnStory = async (storyId: string) => {
+    if (confirmRemoveStoryId !== storyId) {
+      setConfirmRemoveStoryId(storyId);
+      setRemoveStoryError(null);
+      return;
+    }
+    setRemovingStoryId(storyId);
+    setRemoveStoryError(null);
+    try {
+      await deleteOwnStory(storyId);
+      onStoryDeleted?.(storyId);
+      setConfirmRemoveStoryId(null);
+    } catch {
+      setRemoveStoryError(
+        'Could not remove this story right now. Please try again.'
+      );
+    } finally {
+      setRemovingStoryId(null);
     }
   };
 
@@ -359,6 +399,110 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   >
                     Open My Space & Secret Garden Membership →
                   </button>
+                )}
+              </div>
+
+              {/* Private List of User's Own Planted Stories */}
+              <div className="p-4 rounded-2xl bg-slate-50/90 border border-slate-200/80 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-800">
+                    <Flower2 className="w-3.5 h-3.5 text-emerald-600" />
+                    My Planted Stories ({ownPlantedStories.length})
+                  </span>
+                  <span className="text-[10px] font-medium text-slate-500">
+                    Visible only to you
+                  </span>
+                </div>
+
+                {removeStoryError && (
+                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{removeStoryError}</span>
+                  </div>
+                )}
+
+                {ownPlantedStories.length === 0 ? (
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Stories you plant in the meadow appear privately here so you can revisit or remove your own flower anytime while remaining completely anonymous to everyone else.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {ownPlantedStories.map((receipt) => {
+                      const liveStory = stories.find(
+                        (s) => s.storyId === receipt.storyId
+                      );
+                      const seedMeta = SEED_OPTIONS.find(
+                        (s) => s.id === receipt.seedType
+                      );
+                      const isConfirming =
+                        confirmRemoveStoryId === receipt.storyId;
+                      const isRemoving = removingStoryId === receipt.storyId;
+
+                      return (
+                        <div
+                          key={receipt.storyId}
+                          className="p-3 rounded-xl bg-white border border-slate-200/80 space-y-2"
+                        >
+                          <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                            <span className="font-semibold text-slate-700">
+                              {seedMeta?.name || receipt.seedType} Seed
+                            </span>
+                            <span className="tabular-nums">
+                              {formatDateTime(receipt.createdAt)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-700 leading-relaxed line-clamp-2">
+                            “{liveStory?.content || receipt.preview}”
+                          </p>
+                          <div className="flex items-center justify-end gap-2 pt-0.5">
+                            {liveStory && onSelectStory && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onClose();
+                                  onSelectStory(liveStory);
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-[11px] font-medium text-slate-700 cursor-pointer"
+                              >
+                                Open
+                              </button>
+                            )}
+                            {isConfirming && (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmRemoveStoryId(null)}
+                                disabled={isRemoving}
+                                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-[11px] font-medium text-slate-600 hover:bg-slate-50 cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleRemoveOwnStory(receipt.storyId)
+                              }
+                              disabled={isRemoving}
+                              className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-medium cursor-pointer transition-colors disabled:opacity-50 ${
+                                isConfirming
+                                  ? 'bg-rose-600 text-white border-rose-700'
+                                  : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
+                              }`}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>
+                                {isRemoving
+                                  ? 'Removing...'
+                                  : isConfirming
+                                  ? 'Confirm Remove'
+                                  : 'Remove'}
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
 

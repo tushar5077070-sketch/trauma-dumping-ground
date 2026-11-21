@@ -41,6 +41,15 @@ export interface Story {
   isNewlyPlanted?: boolean;
 }
 
+export interface PlantedStoryReceipt {
+  storyId: string;
+  userId: string;
+  seedType: SeedType;
+  flowerVariant: FlowerVariant;
+  preview: string;
+  createdAt: Date;
+}
+
 export interface SupportiveMessage {
   messageId: string;
   storyId: string;

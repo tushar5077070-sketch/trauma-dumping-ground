@@ -39,6 +39,12 @@ service cloud.firestore {
       return isOwner(userId) || isAdmin();
     }
 
+    function isStoryAuthor(storyId) {
+      return isSignedIn() &&
+        isValidId(storyId) &&
+        exists(/databases/$(database)/documents/userAccounts/$(request.auth.uid)/plantedStories/$(storyId));
+    }
+
     // 3. Entity Validation Blueprints (Synchronized with firebase-blueprint.json)
     function isValidStory(data) {
       return data.keys().hasAll([
@@ -714,6 +720,33 @@ service cloud.firestore {
         data.updatedAt is timestamp;
     }
 
+    function isValidPlantedStoryReceipt(data) {
+      return data.keys().hasAll([
+          'storyId',
+          'userId',
+          'seedType',
+          'flowerVariant',
+          'preview',
+          'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'storyId',
+          'userId',
+          'seedType',
+          'flowerVariant',
+          'preview',
+          'createdAt'
+        ]) &&
+        isValidId(data.storyId) &&
+        isValidId(data.userId) &&
+        data.seedType in ['daisy', 'sunflower', 'lavender'] &&
+        data.flowerVariant in ['pink-tulip', 'yellow-tulip', 'orange-tulip', 'purple-wildflower', 'daisy', 'sunflower', 'lavender'] &&
+        data.preview is string &&
+        data.preview.size() >= 1 &&
+        data.preview.size() <= 160 &&
+        data.createdAt is timestamp;
+    }
+
     // 4. Collection Rules: Stories
     match /stories/{storyId} {
       allow get: if isValidId(storyId) && (existing().moderationStatus == 'approved' || isAdmin());
@@ -730,7 +763,8 @@ service cloud.firestore {
         incoming().messageCount >= 0 &&
         incoming().messageCount <= 50 &&
         incoming().createdAt == request.time &&
-        incoming().updatedAt == request.time;
+        incoming().updatedAt == request.time &&
+        existsAfter(/databases/$(database)/documents/userAccounts/$(request.auth.uid)/plantedStories/$(storyId));
 
       allow update: if isValidStory(incoming()) &&
         isValidId(storyId) &&
@@ -761,7 +795,7 @@ service cloud.firestore {
             incoming().diff(existing()).affectedKeys().hasOnly(['moderationStatus', 'updatedAt']))
         );
 
-      allow delete: if isAdmin() && isValidId(storyId);
+      allow delete: if isValidId(storyId) && (isAdmin() || isStoryAuthor(storyId));
 
       // Subcollection: Reactions
       match /reactions/{reactionId} {
@@ -785,7 +819,7 @@ service cloud.firestore {
             get(/databases/$(database)/documents/stories/$(storyId)).data.warmthCount + 1;
 
         allow update: if false;
-        allow delete: if isAdmin() && isValidId(storyId) && isValidId(reactionId);
+        allow delete: if isValidId(storyId) && isValidId(reactionId) && (isAdmin() || isStoryAuthor(storyId));
       }
 
       // Subcollection: Supportive Messages
@@ -817,7 +851,7 @@ service cloud.firestore {
           isAdmin() &&
           incoming().diff(existing()).affectedKeys().hasOnly(['moderationStatus']);
 
-        allow delete: if isAdmin() && isValidId(storyId) && isValidId(messageId);
+        allow delete: if isValidId(storyId) && isValidId(messageId) && (isAdmin() || isStoryAuthor(storyId));
       }
     }
 
@@ -1093,6 +1127,26 @@ service cloud.firestore {
           ]);
 
         allow delete: if isOwner(userId) && isValidId(userId) && isValidId(prefId);
+      }
+
+      // 6G. Strictly Private Planted Story Ownership Receipts (Owner-Only, Atomic With Story Creation)
+      match /plantedStories/{storyId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(storyId);
+        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+          request.auth.token.email_verified == true &&
+          isValidId(userId) &&
+          isValidId(storyId) &&
+          isValidPlantedStoryReceipt(incoming()) &&
+          incoming().storyId == storyId &&
+          incoming().userId == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          !exists(/databases/$(database)/documents/stories/$(storyId)) &&
+          existsAfter(/databases/$(database)/documents/stories/$(storyId));
+
+        allow update: if false;
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(storyId);
       }
     }
 

@@ -17,6 +17,7 @@ import {
   AMBIENT_MEADOW_FLOWERS,
   AmbientMeadowFlower,
   FlowerVariant,
+  PlantedStoryReceipt,
   ReactionType,
   SeedType,
   Story,
@@ -232,6 +233,116 @@ export async function deleteModerationReportAsAdmin(
   }
 }
 
+/**
+ * Subscribes strictly to the signed-in user's private planted story ownership receipts.
+ * Only the owning user can read this subcollection; public stories remain 100% anonymous.
+ */
+export function subscribeToOwnPlantedStories(
+  userId: string,
+  onUpdate: (receipts: PlantedStoryReceipt[]) => void,
+  onError?: (err: Error) => void
+): () => void {
+  const cleanUid = userId.trim();
+  if (!cleanUid || !/^[a-zA-Z0-9_-]{1,64}$/.test(cleanUid)) {
+    onUpdate([]);
+    return () => {};
+  }
+
+  const path = `userAccounts/${cleanUid}/plantedStories`;
+  const q = query(
+    collection(db, 'userAccounts', cleanUid, 'plantedStories'),
+    where('userId', '==', cleanUid)
+  );
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const list: PlantedStoryReceipt[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data();
+        list.push({
+          storyId: String(d.storyId || docSnap.id),
+          userId: String(d.userId || cleanUid),
+          seedType: (d.seedType as SeedType) || 'daisy',
+          flowerVariant: (d.flowerVariant as FlowerVariant) || 'pink-tulip',
+          preview: String(d.preview || ''),
+          createdAt: toDate(d.createdAt),
+        });
+      });
+      list.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      onUpdate(list);
+    },
+    (error) => {
+      try {
+        handleFirestoreError(error, OperationType.LIST, path);
+      } catch (err) {
+        onError?.(err instanceof Error ? err : new Error(String(err)));
+        onUpdate([]);
+      }
+    }
+  );
+}
+
+/**
+ * Allows the original signed-in author to permanently remove their own planted story
+ * from the meadow and Firestore, verified by their private plantedStories receipt.
+ */
+export async function deleteOwnStory(storyId: string): Promise<void> {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('Please sign in with Google to remove your story.');
+  }
+
+  const cleanId = storyId.trim();
+  if (!cleanId || !/^[a-zA-Z0-9_-]{1,64}$/.test(cleanId)) {
+    throw new Error('Invalid story ID.');
+  }
+
+  const uid = currentUser.uid;
+  const storyPath = `stories/${cleanId}`;
+
+  // Step 1: Best-effort cleanup of approved messages & valid reactions while receipt still exists
+  try {
+    const [messagesSnap, reactionsSnap] = await Promise.all([
+      getDocs(
+        query(
+          collection(db, 'stories', cleanId, 'messages'),
+          where('moderationStatus', '==', 'approved')
+        )
+      ),
+      getDocs(
+        query(
+          collection(db, 'stories', cleanId, 'reactions'),
+          where('reactionType', 'in', ['warmth', 'sunlight', 'gentle-rain'])
+        )
+      ),
+    ]);
+
+    const subRefs = [
+      ...messagesSnap.docs.map((d) => d.ref),
+      ...reactionsSnap.docs.map((d) => d.ref),
+    ];
+
+    for (let i = 0; i < subRefs.length; i += 400) {
+      const batch = writeBatch(db);
+      subRefs.slice(i, i + 400).forEach((ref) => batch.delete(ref));
+      await batch.commit();
+    }
+  } catch {
+    // Proceed to delete the main story and ownership receipt even if subcollection cleanup hits an edge case
+  }
+
+  // Step 2: Atomically delete the public story and the author's private ownership receipt
+  try {
+    const finalBatch = writeBatch(db);
+    finalBatch.delete(doc(db, 'stories', cleanId));
+    finalBatch.delete(doc(db, 'userAccounts', uid, 'plantedStories', cleanId));
+    await finalBatch.commit();
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, storyPath);
+  }
+}
+
 export interface PlantStoryInput {
   content: string;
   seedType: SeedType;
@@ -320,8 +431,18 @@ export async function plantNewStory(input: PlantStoryInput): Promise<Story> {
   };
 
   const docPath = `stories/${storyId}`;
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error(
+      'Please sign in with Google before planting a seed in the meadow.'
+    );
+  }
+  const uid = currentUser.uid;
+  const preview = trimmedContent.slice(0, 140);
+
   try {
-    await setDoc(doc(db, 'stories', storyId), {
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'stories', storyId), {
       storyId: newStory.storyId,
       anonymousId: newStory.anonymousId,
       content: newStory.content,
@@ -337,6 +458,15 @@ export async function plantNewStory(input: PlantStoryInput): Promise<Story> {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+    batch.set(doc(db, 'userAccounts', uid, 'plantedStories', storyId), {
+      storyId: newStory.storyId,
+      userId: uid,
+      seedType: newStory.seedType,
+      flowerVariant: newStory.flowerVariant,
+      preview,
+      createdAt: serverTimestamp(),
+    });
+    await batch.commit();
     localStorage.setItem(LAST_PLANT_TIMESTAMP_KEY, String(Date.now()));
     return newStory;
   } catch (error) {

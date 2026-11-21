@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { SEED_OPTIONS, Story, SupportiveMessage } from '../types/garden';
 import {
+  deleteOwnStory,
   deleteStoryAsAdmin,
   leaveSupportiveMessage,
   reportStoryContent,
@@ -29,6 +30,7 @@ import { MeadowFlowerSvg } from './FlowerIllustration';
 interface StoryReaderModalProps {
   story: Story | null;
   isAdmin?: boolean;
+  isAuthor?: boolean;
   onClose: () => void;
   onReadAnother: () => void;
   onLocalStoryWarmthIncrement: (storyId: string) => void;
@@ -61,6 +63,7 @@ function formatRelativeTime(date: Date): string {
 export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
   story,
   isAdmin = false,
+  isAuthor = false,
   onClose,
   onReadAnother,
   onLocalStoryWarmthIncrement,
@@ -171,16 +174,24 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
     setReportSubmitted(true);
   };
 
-  const handleAdminDeleteStory = async () => {
-    if (!isAdmin || isDeletingStory) return;
+  const canRemoveStory = isAuthor || isAdmin;
+
+  const handleDeleteStory = async () => {
+    if (!canRemoveStory || isDeletingStory) return;
     setIsDeletingStory(true);
     setAdminDeleteError(null);
     try {
-      await deleteStoryAsAdmin(story.storyId);
+      if (isAuthor) {
+        await deleteOwnStory(story.storyId);
+      } else {
+        await deleteStoryAsAdmin(story.storyId);
+      }
       onStoryDeleted?.(story.storyId);
       onClose();
     } catch (err) {
-      let friendly = 'Could not delete this story. Please verify your admin sign-in.';
+      let friendly = isAuthor
+        ? 'Could not remove your story right now. Please try again.'
+        : 'Could not delete this story. Please verify your admin sign-in.';
       if (err instanceof Error) {
         try {
           const parsed = JSON.parse(err.message);
@@ -254,14 +265,18 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
               )}
             </button>
 
-            {isAdmin && (
+            {canRemoveStory && (
               <button
                 type="button"
                 onClick={() => {
                   setShowAdminDeleteConfirm((prev) => !prev);
                   setAdminDeleteError(null);
                 }}
-                title="Admin: Delete harmful story"
+                title={
+                  isAuthor
+                    ? 'Remove your planted story'
+                    : 'Admin: Delete harmful story'
+                }
                 className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                   showAdminDeleteConfirm
                     ? 'bg-rose-600 text-white'
@@ -269,7 +284,9 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
                 }`}
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Delete</span>
+                <span className="hidden sm:inline">
+                  {isAuthor ? 'Remove My Story' : 'Delete'}
+                </span>
               </button>
             )}
 
@@ -309,12 +326,19 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
             </div>
 
             <div className="flex-1 min-w-0 text-left">
-              <h2
-                id="story-soul-heading"
-                className="font-editorial text-xl sm:text-3xl font-semibold text-slate-900 leading-tight"
-              >
-                Anonymous Soul
-              </h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2
+                  id="story-soul-heading"
+                  className="font-editorial text-xl sm:text-3xl font-semibold text-slate-900 leading-tight"
+                >
+                  Anonymous Soul
+                </h2>
+                {isAuthor && (
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-semibold text-emerald-800">
+                    Planted by you · Anonymous to others
+                  </span>
+                )}
+              </div>
 
               <div className="flex items-center gap-2 text-[11px] sm:text-xs text-slate-500 mt-0.5">
                 <span className="tabular-nums">
@@ -352,17 +376,21 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
             </div>
           </div>
 
-          {/* Admin Permanent Delete Confirmation Drawer */}
-          {isAdmin && showAdminDeleteConfirm && (
+          {/* Permanent Delete Confirmation Drawer (Story Author or Admin) */}
+          {canRemoveStory && showAdminDeleteConfirm && (
             <div className="p-3.5 sm:p-4 rounded-2xl bg-rose-50 border border-rose-300 space-y-2.5">
               <div className="flex items-start gap-2.5">
                 <ShieldAlert className="w-4 h-4 text-rose-700 shrink-0 mt-0.5" />
                 <div className="text-xs text-rose-900 space-y-1">
                   <p className="font-semibold">
-                    Admin Moderation: Permanently delete this story?
+                    {isAuthor
+                      ? 'Remove your story from the meadow?'
+                      : 'Admin Moderation: Permanently delete this story?'}
                   </p>
                   <p className="text-rose-800/90 leading-relaxed">
-                    If you found this story harmful, deleting it will immediately remove the flower, its reactions, and its replies from the meadow and database. This cannot be undone.
+                    {isAuthor
+                      ? 'This will permanently remove your flower, its warmth reactions, and its kind messages from the meadow and database. This cannot be undone.'
+                      : 'If you found this story harmful, deleting it will immediately remove the flower, its reactions, and its replies from the meadow and database. This cannot be undone.'}
                   </p>
                 </div>
               </div>
@@ -383,13 +411,17 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={handleAdminDeleteStory}
+                  onClick={handleDeleteStory}
                   disabled={isDeletingStory}
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-800 disabled:opacity-50 text-white text-xs font-medium cursor-pointer"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>
-                    {isDeletingStory ? 'Deleting Story...' : 'Permanently Delete'}
+                    {isDeletingStory
+                      ? 'Removing...'
+                      : isAuthor
+                      ? 'Remove My Story'
+                      : 'Permanently Delete'}
                   </span>
                 </button>
               </div>

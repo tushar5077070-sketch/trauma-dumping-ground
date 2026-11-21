@@ -1084,6 +1084,56 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "PlantedStoryReceipt": {
+      "title": "PlantedStoryReceipt",
+      "description": "Strictly private owner-only receipt linking a signed-in user to a public anonymous story they planted so they can delete their own story without storing identity on the public story document.",
+      "type": "object",
+      "properties": {
+        "storyId": {
+          "type": "string",
+          "description": "ID of the anonymous story planted by this user.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the author.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "seedType": {
+          "type": "string",
+          "description": "The seed archetype chosen when planting.",
+          "enum": ["daisy", "sunflower", "lavender"]
+        },
+        "flowerVariant": {
+          "type": "string",
+          "description": "The flower variety rendered for this planted story.",
+          "enum": ["pink-tulip", "yellow-tulip", "orange-tulip", "purple-wildflower", "daisy", "sunflower", "lavender"]
+        },
+        "preview": {
+          "type": "string",
+          "description": "Short private excerpt so the author can recognize their planted story.",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the story was planted."
+        }
+      },
+      "required": [
+        "storyId",
+        "userId",
+        "seedType",
+        "flowerVariant",
+        "preview",
+        "createdAt"
+      ]
     }
   },
   "firestore": {
@@ -1142,6 +1192,10 @@
     "/userAccounts/{userId}/innerPrivacyPrefs/{prefId}": {
       "schema": "InnerPrivacyPrefs",
       "description": "Explicit user privacy consent toggles for My Inner Garden audio storage and AI processing."
+    },
+    "/userAccounts/{userId}/plantedStories/{storyId}": {
+      "schema": "PlantedStoryReceipt",
+      "description": "Strictly private owner-only ownership receipts allowing authors to remove their own planted stories while keeping public stories completely anonymous."
     }
   }
 }

@@ -22,6 +22,7 @@ import {
   InnerJournalEntry,
   InnerPrivacyPrefs,
   InnerReflectionMemory,
+  PlantedStoryReceipt,
   SavedMemory,
   SecretGardenMembership,
   SeedType,
@@ -29,7 +30,10 @@ import {
   SupportiveMessage,
   VoiceJournal,
 } from './types/garden';
-import { subscribeToApprovedStories } from './services/gardenService';
+import {
+  subscribeToApprovedStories,
+  subscribeToOwnPlantedStories,
+} from './services/gardenService';
 import {
   ensureUserAccountSynced,
   isVerifiedAdminUser,
@@ -107,6 +111,9 @@ export default function App() {
   >([]);
   const [innerPrivacyPrefs, setInnerPrivacyPrefs] =
     useState<InnerPrivacyPrefs | null>(null);
+  const [ownPlantedStories, setOwnPlantedStories] = useState<
+    PlantedStoryReceipt[]
+  >([]);
   const [localCustomisation, setLocalCustomisation] =
     useState<GardenCustomisationSettings>(() => loadLocalGardenCustomisation());
 
@@ -144,6 +151,7 @@ export default function App() {
       setInnerEntries([]);
       setInnerReflections([]);
       setInnerPrivacyPrefs(null);
+      setOwnPlantedStories([]);
       return;
     }
 
@@ -188,6 +196,11 @@ export default function App() {
       setInnerPrivacyPrefs,
       () => {}
     );
+    const unsubOwnPlanted = subscribeToOwnPlantedStories(
+      currentUser.uid,
+      setOwnPlantedStories,
+      () => {}
+    );
 
     return () => {
       unsubMembership();
@@ -197,6 +210,7 @@ export default function App() {
       unsubInnerEntries();
       unsubInnerReflections();
       unsubInnerPrefs();
+      unsubOwnPlanted();
     };
   }, [currentUser]);
 
@@ -273,6 +287,11 @@ export default function App() {
   const savedMemorySourceIds = useMemo(
     () => new Set(memories.map((m) => m.sourceId)),
     [memories]
+  );
+
+  const ownPlantedStoryIds = useMemo(
+    () => new Set(ownPlantedStories.map((r) => r.storyId)),
+    [ownPlantedStories]
   );
 
   const handleUpdateCustomisation = async (
@@ -661,6 +680,7 @@ export default function App() {
       <StoryReaderModal
         story={activeStory}
         isAdmin={isAdmin}
+        isAuthor={Boolean(activeStory && ownPlantedStoryIds.has(activeStory.storyId))}
         onClose={() => setActiveStory(null)}
         onReadAnother={handleReadRandomStory}
         onLocalStoryWarmthIncrement={handleLocalStoryWarmthIncrement}
@@ -707,6 +727,10 @@ export default function App() {
         isOpen={isAccountModalOpen}
         currentUser={currentUser}
         secretGardenMembership={secretMembership}
+        ownPlantedStories={ownPlantedStories}
+        stories={stories}
+        onSelectStory={handleSelectStory}
+        onStoryDeleted={handleStoryDeleted}
         onClose={() => setIsAccountModalOpen(false)}
         onOpenAdminConsole={() => setIsAdminModalOpen(true)}
         onOpenMySpace={() => setIsMySpaceOpen(true)}

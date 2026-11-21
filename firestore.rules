@@ -784,7 +784,8 @@ service cloud.firestore {
           getAfter(/databases/$(database)/documents/stories/$(storyId)).data.warmthCount ==
             get(/databases/$(database)/documents/stories/$(storyId)).data.warmthCount + 1;
 
-        allow update, delete: if false;
+        allow update: if false;
+        allow delete: if isAdmin() && isValidId(storyId) && isValidId(reactionId);
       }
 
       // Subcollection: Supportive Messages
@@ -832,7 +833,8 @@ service cloud.firestore {
         incoming().createdAt == request.time &&
         exists(/databases/$(database)/documents/stories/$(incoming().storyId));
 
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAdmin() && isValidId(reportId);
     }
 
     // 6. Collection Rules: User Accounts & Strictly Private My Space Subcollections

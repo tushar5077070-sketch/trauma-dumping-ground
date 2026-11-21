@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteDoc,
   doc,
   getDocs,
   onSnapshot,
@@ -11,6 +12,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../firebase';
+import { isVerifiedAdminUser } from './authAccountService';
 import {
   AMBIENT_MEADOW_FLOWERS,
   AmbientMeadowFlower,
@@ -167,6 +169,66 @@ export async function purgeLegacyGardenStories(): Promise<{
     return { deletedCount };
   } catch (error) {
     handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+/**
+ * Admin-only deletion of a harmful story and its subcollections (messages & reactions).
+ * Enforced both client-side and server-side by firestore.rules (`isAdmin()`).
+ */
+export async function deleteStoryAsAdmin(storyId: string): Promise<void> {
+  if (!isVerifiedAdminUser(auth.currentUser)) {
+    throw new Error('Only the verified admin account can delete stories.');
+  }
+
+  const cleanId = storyId.trim();
+  if (!cleanId || !/^[a-zA-Z0-9_-]{1,64}$/.test(cleanId)) {
+    throw new Error('Invalid story ID.');
+  }
+
+  const storyPath = `stories/${cleanId}`;
+  try {
+    const [messagesSnap, reactionsSnap] = await Promise.all([
+      getDocs(collection(db, 'stories', cleanId, 'messages')),
+      getDocs(collection(db, 'stories', cleanId, 'reactions')),
+    ]);
+
+    const refsToDelete = [
+      ...messagesSnap.docs.map((d) => d.ref),
+      ...reactionsSnap.docs.map((d) => d.ref),
+      doc(db, 'stories', cleanId),
+    ];
+
+    for (let i = 0; i < refsToDelete.length; i += 400) {
+      const batch = writeBatch(db);
+      refsToDelete.slice(i, i + 400).forEach((ref) => batch.delete(ref));
+      await batch.commit();
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, storyPath);
+  }
+}
+
+/**
+ * Admin-only dismissal/deletion of a moderation report record.
+ */
+export async function deleteModerationReportAsAdmin(
+  reportId: string
+): Promise<void> {
+  if (!isVerifiedAdminUser(auth.currentUser)) {
+    throw new Error('Only the verified admin account can manage reports.');
+  }
+
+  const cleanId = reportId.trim();
+  if (!cleanId || !/^[a-zA-Z0-9_-]{1,64}$/.test(cleanId)) {
+    throw new Error('Invalid report ID.');
+  }
+
+  const reportPath = `reports/${cleanId}`;
+  try {
+    await deleteDoc(doc(db, 'reports', cleanId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, reportPath);
   }
 }
 

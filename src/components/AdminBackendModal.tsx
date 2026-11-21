@@ -15,10 +15,13 @@ import {
   ShieldCheck,
   Monitor,
   Clock,
+  Flower2,
 } from 'lucide-react';
 import {
   LoginEvent,
   ModerationReportRecord,
+  SEED_OPTIONS,
+  Story,
   SUBSCRIPTION_PLAN_CATALOG,
   SubscriptionBillingCycle,
   SubscriptionCurrency,
@@ -38,15 +41,21 @@ import {
   subscribeToAllUserAccounts,
   updateSubscriptionPlan,
 } from '../services/authAccountService';
-import { purgeLegacyGardenStories } from '../services/gardenService';
+import {
+  deleteModerationReportAsAdmin,
+  deleteStoryAsAdmin,
+  purgeLegacyGardenStories,
+} from '../services/gardenService';
 
 interface AdminBackendModalProps {
   isOpen: boolean;
   currentUser: User | null;
+  stories: Story[];
+  onStoryDeleted?: (storyId: string) => void;
   onClose: () => void;
 }
 
-type AdminTab = 'users' | 'logins' | 'subscriptions' | 'reports';
+type AdminTab = 'users' | 'logins' | 'subscriptions' | 'stories' | 'reports';
 
 function formatDateTime(date: Date): string {
   return date.toLocaleString(undefined, {
@@ -77,6 +86,8 @@ function formatMoney(amount: number, currency: string): string {
 export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
   isOpen,
   currentUser,
+  stories,
+  onStoryDeleted,
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
@@ -108,6 +119,13 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
     message: string;
   } | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmDeleteStoryId, setConfirmDeleteStoryId] = useState<string | null>(
+    null
+  );
+  const [deletingStoryId, setDeletingStoryId] = useState<string | null>(null);
+  const [dismissingReportId, setDismissingReportId] = useState<string | null>(
+    null
+  );
   const [backendError, setBackendError] = useState<string | null>(null);
   const [confirmPurgeLegacy, setConfirmPurgeLegacy] = useState(false);
   const [isPurgingLegacy, setIsPurgingLegacy] = useState(false);
@@ -191,6 +209,26 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
       );
     });
   }, [subscriptions, searchQuery, statusFilter]);
+
+  const filteredStories = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return stories;
+    return stories.filter(
+      (s) =>
+        s.content.toLowerCase().includes(q) ||
+        s.seedType.toLowerCase().includes(q) ||
+        s.contentWarning.toLowerCase().includes(q) ||
+        s.storyId.toLowerCase().includes(q)
+    );
+  }, [stories, searchQuery]);
+
+  const storyByIdMap = useMemo(() => {
+    const map = new Map<string, Story>();
+    for (const st of stories) {
+      map.set(st.storyId, st);
+    }
+    return map;
+  }, [stories]);
 
   const activeSubsCount = useMemo(
     () =>
@@ -329,6 +367,50 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
     }
   };
 
+  const handleDeleteStory = async (storyId: string) => {
+    if (confirmDeleteStoryId !== storyId) {
+      setConfirmDeleteStoryId(storyId);
+      return;
+    }
+    setDeletingStoryId(storyId);
+    setFormFeedback(null);
+    try {
+      await deleteStoryAsAdmin(storyId);
+      onStoryDeleted?.(storyId);
+      setConfirmDeleteStoryId(null);
+      setFormFeedback({
+        type: 'success',
+        message: 'Harmful story permanently deleted from the meadow and Firestore.',
+      });
+    } catch {
+      setFormFeedback({
+        type: 'error',
+        message: 'Could not delete story. Verify you are signed in as the verified admin account.',
+      });
+    } finally {
+      setDeletingStoryId(null);
+    }
+  };
+
+  const handleDismissReport = async (reportId: string) => {
+    setDismissingReportId(reportId);
+    setFormFeedback(null);
+    try {
+      await deleteModerationReportAsAdmin(reportId);
+      setFormFeedback({
+        type: 'success',
+        message: 'Moderation report dismissed.',
+      });
+    } catch {
+      setFormFeedback({
+        type: 'error',
+        message: 'Could not dismiss report. Verify admin permissions.',
+      });
+    } finally {
+      setDismissingReportId(null);
+    }
+  };
+
   return (
     <div
       role="dialog"
@@ -428,6 +510,18 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
               >
                 <CreditCard className="w-3.5 h-3.5" />
                 <span>Subscriptions ({subscriptions.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('stories')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                  activeTab === 'stories'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+                }`}
+              >
+                <Flower2 className="w-3.5 h-3.5" />
+                <span>Stories ({stories.length})</span>
               </button>
               <button
                 type="button"
@@ -957,7 +1051,86 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
             </div>
           )}
 
-          {/* TAB 4: MODERATION REPORTS */}
+          {/* TAB 4: PLANTED STORIES MODERATION */}
+          {activeTab === 'stories' && (
+            <div className="space-y-2.5">
+              {filteredStories.length === 0 ? (
+                <div className="p-8 text-center rounded-2xl bg-slate-50 border border-slate-200/70 text-xs text-slate-500">
+                  No planted stories match your search right now.
+                </div>
+              ) : (
+                filteredStories.map((st) => {
+                  const seedMeta = SEED_OPTIONS.find(
+                    (opt) => opt.id === st.seedType
+                  );
+                  const isConfirming = confirmDeleteStoryId === st.storyId;
+                  const isDeleting = deletingStoryId === st.storyId;
+                  return (
+                    <div
+                      key={st.storyId}
+                      className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/80"
+                    >
+                      <div className="min-w-0 flex-1 space-y-1.5">
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                          <span className="font-semibold text-slate-800">
+                            {seedMeta?.name || st.seedType} Seed
+                          </span>
+                          <span aria-hidden="true">·</span>
+                          <span>{formatDateTime(st.createdAt)}</span>
+                          <span aria-hidden="true">·</span>
+                          <span className="tabular-nums">
+                            {st.warmthCount} warmth · {st.messageCount} replies
+                          </span>
+                          {st.contentWarning && (
+                            <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-medium">
+                              CW: {st.contentWarning}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs sm:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap break-words">
+                          “{st.content}”
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isConfirming && (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteStoryId(null)}
+                            disabled={isDeleting}
+                            className="px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteStory(st.storyId)}
+                          disabled={isDeleting}
+                          className={`px-3 py-1.5 rounded-xl border text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50 whitespace-nowrap ${
+                            isConfirming
+                              ? 'bg-rose-600 text-white border-rose-700'
+                              : 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200'
+                          }`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>
+                            {isDeleting
+                              ? 'Deleting...'
+                              : isConfirming
+                              ? 'Confirm Delete'
+                              : 'Delete Story'}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+
+          {/* TAB 5: MODERATION REPORTS */}
           {activeTab === 'reports' && (
             <div className="space-y-2.5">
               {reports.length === 0 ? (
@@ -965,24 +1138,73 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
                   No moderation reports have been filed.
                 </div>
               ) : (
-                reports.map((rep) => (
-                  <div
-                    key={rep.reportId}
-                    className="p-3.5 rounded-2xl bg-rose-50/60 border border-rose-200/75 space-y-1"
-                  >
-                    <div className="flex items-center justify-between gap-2 text-xs">
-                      <span className="font-semibold text-rose-900 capitalize">
-                        {rep.reason} · Story {rep.storyId}
-                      </span>
-                      <span className="text-[11px] text-rose-700">
-                        {formatDateTime(rep.createdAt)}
-                      </span>
+                reports.map((rep) => {
+                  const linkedStory = storyByIdMap.get(rep.storyId);
+                  const isConfirming = confirmDeleteStoryId === rep.storyId;
+                  const isDeleting = deletingStoryId === rep.storyId;
+                  const isDismissing = dismissingReportId === rep.reportId;
+
+                  return (
+                    <div
+                      key={rep.reportId}
+                      className="p-3.5 rounded-2xl bg-rose-50/60 border border-rose-200/75 space-y-2"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <span className="font-semibold text-rose-900 capitalize">
+                          {rep.reason} · Story {rep.storyId}
+                        </span>
+                        <span className="text-[11px] text-rose-700">
+                          {formatDateTime(rep.createdAt)}
+                        </span>
+                      </div>
+                      {rep.details && (
+                        <p className="text-xs text-rose-900/85">
+                          Report note: {rep.details}
+                        </p>
+                      )}
+                      {linkedStory ? (
+                        <p className="p-2.5 rounded-xl bg-white/85 border border-rose-200/70 text-xs text-slate-800 leading-relaxed">
+                          “{linkedStory.content}”
+                        </p>
+                      ) : (
+                        <p className="text-[11px] font-medium text-emerald-700">
+                          This story is no longer in the live meadow.
+                        </p>
+                      )}
+                      <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => handleDismissReport(rep.reportId)}
+                          disabled={isDismissing}
+                          className="px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700 cursor-pointer disabled:opacity-50"
+                        >
+                          {isDismissing ? 'Dismissing...' : 'Dismiss Report'}
+                        </button>
+                        {linkedStory && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteStory(rep.storyId)}
+                            disabled={isDeleting}
+                            className={`px-3 py-1.5 rounded-xl border text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50 ${
+                              isConfirming
+                                ? 'bg-rose-700 text-white border-rose-800'
+                                : 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700'
+                            }`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>
+                              {isDeleting
+                                ? 'Deleting...'
+                                : isConfirming
+                                ? 'Confirm Delete Story'
+                                : 'Delete Story'}
+                            </span>
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    {rep.details && (
-                      <p className="text-xs text-rose-900/80">{rep.details}</p>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           )}

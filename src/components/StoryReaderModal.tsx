@@ -12,9 +12,12 @@ import {
   Bookmark,
   BookmarkCheck,
   AlertCircle,
+  Trash2,
+  ShieldAlert,
 } from 'lucide-react';
 import { SEED_OPTIONS, Story, SupportiveMessage } from '../types/garden';
 import {
+  deleteStoryAsAdmin,
   leaveSupportiveMessage,
   reportStoryContent,
   sendWarmthReaction,
@@ -25,9 +28,11 @@ import { MeadowFlowerSvg } from './FlowerIllustration';
 
 interface StoryReaderModalProps {
   story: Story | null;
+  isAdmin?: boolean;
   onClose: () => void;
   onReadAnother: () => void;
   onLocalStoryWarmthIncrement: (storyId: string) => void;
+  onStoryDeleted?: (storyId: string) => void;
   canSaveMemories?: boolean;
   savedSourceIds?: Set<string>;
   onSaveStoryToMemory?: (story: Story) => Promise<void>;
@@ -55,9 +60,11 @@ function formatRelativeTime(date: Date): string {
 
 export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
   story,
+  isAdmin = false,
   onClose,
   onReadAnother,
   onLocalStoryWarmthIncrement,
+  onStoryDeleted,
   canSaveMemories = false,
   savedSourceIds,
   onSaveStoryToMemory,
@@ -81,6 +88,9 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
   >('other');
   const [reportDetails, setReportDetails] = useState('');
   const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [showAdminDeleteConfirm, setShowAdminDeleteConfirm] = useState(false);
+  const [isDeletingStory, setIsDeletingStory] = useState(false);
+  const [adminDeleteError, setAdminDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!story) return;
@@ -94,6 +104,9 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
     setShowReportPanel(false);
     setReportSubmitted(false);
     setReportDetails('');
+    setShowAdminDeleteConfirm(false);
+    setIsDeletingStory(false);
+    setAdminDeleteError(null);
 
     const unsubscribe = subscribeToStoryMessages(story.storyId, (loaded) => {
       setMessages(loaded);
@@ -158,6 +171,29 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
     setReportSubmitted(true);
   };
 
+  const handleAdminDeleteStory = async () => {
+    if (!isAdmin || isDeletingStory) return;
+    setIsDeletingStory(true);
+    setAdminDeleteError(null);
+    try {
+      await deleteStoryAsAdmin(story.storyId);
+      onStoryDeleted?.(story.storyId);
+      onClose();
+    } catch (err) {
+      let friendly = 'Could not delete this story. Please verify your admin sign-in.';
+      if (err instanceof Error) {
+        try {
+          const parsed = JSON.parse(err.message);
+          friendly = parsed.error || friendly;
+        } catch {
+          friendly = err.message;
+        }
+      }
+      setAdminDeleteError(friendly);
+      setIsDeletingStory(false);
+    }
+  };
+
   return (
     <div
       role="dialog"
@@ -217,6 +253,25 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
                 </>
               )}
             </button>
+
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAdminDeleteConfirm((prev) => !prev);
+                  setAdminDeleteError(null);
+                }}
+                title="Admin: Delete harmful story"
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                  showAdminDeleteConfirm
+                    ? 'bg-rose-600 text-white'
+                    : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                }`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Delete</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -296,6 +351,50 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
               )}
             </div>
           </div>
+
+          {/* Admin Permanent Delete Confirmation Drawer */}
+          {isAdmin && showAdminDeleteConfirm && (
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-rose-50 border border-rose-300 space-y-2.5">
+              <div className="flex items-start gap-2.5">
+                <ShieldAlert className="w-4 h-4 text-rose-700 shrink-0 mt-0.5" />
+                <div className="text-xs text-rose-900 space-y-1">
+                  <p className="font-semibold">
+                    Admin Moderation: Permanently delete this story?
+                  </p>
+                  <p className="text-rose-800/90 leading-relaxed">
+                    If you found this story harmful, deleting it will immediately remove the flower, its reactions, and its replies from the meadow and database. This cannot be undone.
+                  </p>
+                </div>
+              </div>
+              {adminDeleteError && (
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-rose-200 text-xs text-rose-700">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>{adminDeleteError}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAdminDeleteConfirm(false)}
+                  disabled={isDeletingStory}
+                  className="px-3 py-1.5 rounded-lg bg-white border border-rose-200 text-xs font-medium text-slate-700 hover:bg-slate-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAdminDeleteStory}
+                  disabled={isDeletingStory}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-800 disabled:opacity-50 text-white text-xs font-medium cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>
+                    {isDeletingStory ? 'Deleting Story...' : 'Permanently Delete'}
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Optional Moderation Report Drawer */}
           {showReportPanel && (

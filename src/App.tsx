@@ -250,6 +250,11 @@ export default function App() {
     );
   }, []);
 
+  const handleStoryDeleted = useCallback((storyId: string) => {
+    setStories((prev) => prev.filter((s) => s.storyId !== storyId));
+    setActiveStory((curr) => (curr?.storyId === storyId ? null : curr));
+  }, []);
+
   const activeGardenCustomisation: GardenCustomisationSettings = useMemo(() => {
     if (!hasPremiumAccess) {
       return DEFAULT_GARDEN_CUSTOMISATION;
@@ -655,9 +660,11 @@ export default function App() {
       {/* 4. Story Reading Sanctuary Modal */}
       <StoryReaderModal
         story={activeStory}
+        isAdmin={isAdmin}
         onClose={() => setActiveStory(null)}
         onReadAnother={handleReadRandomStory}
         onLocalStoryWarmthIncrement={handleLocalStoryWarmthIncrement}
+        onStoryDeleted={handleStoryDeleted}
         canSaveMemories={Boolean(currentUser && hasPremiumAccess)}
         savedSourceIds={savedMemorySourceIds}
         onSaveStoryToMemory={handleSaveStoryToMemory}
@@ -709,6 +716,8 @@ export default function App() {
       <AdminBackendModal
         isOpen={isAdminModalOpen}
         currentUser={currentUser}
+        stories={stories}
+        onStoryDeleted={handleStoryDeleted}
         onClose={() => setIsAdminModalOpen(false)}
       />
 

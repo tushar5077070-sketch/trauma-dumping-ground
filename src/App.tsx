@@ -68,6 +68,18 @@ import { AdminBackendModal } from './components/AdminBackendModal';
 import { MySpaceModal } from './components/MySpaceModal';
 import { SecretGardenUpgradeModal } from './components/SecretGardenUpgradeModal';
 import { InnerGardenModal } from './components/InnerGardenModal';
+import {
+  PrivacyTrustModal,
+  PrivacyTrustTab,
+} from './components/PrivacyTrustModal';
+import {
+  clearActiveVaultPassphrase,
+  getActiveVaultPassphrase,
+  isLockedVaultText,
+  isVaultUnlocked,
+  subscribeVaultLockState,
+  tryDecryptStoredText,
+} from './utils/vaultCrypto';
 
 export default function App() {
   const [stories, setStories] = useState<Story[]>(() =>
@@ -93,13 +105,26 @@ export default function App() {
   const [upgradeFocusFeature, setUpgradeFocusFeature] = useState<string | null>(
     null
   );
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+  const [privacyModalTab, setPrivacyModalTab] =
+    useState<PrivacyTrustTab>('overview');
+  const [vaultUnlocked, setVaultUnlocked] = useState<boolean>(() =>
+    isVaultUnlocked()
+  );
 
   const [secretMembership, setSecretMembership] =
     useState<SecretGardenMembership | null>(null);
+  const [rawDiaryEntries, setRawDiaryEntries] = useState<DiaryEntry[]>([]);
   const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
   const [voiceJournals, setVoiceJournals] = useState<VoiceJournal[]>([]);
   const [memories, setMemories] = useState<SavedMemory[]>([]);
+  const [rawInnerEntries, setRawInnerEntries] = useState<InnerJournalEntry[]>(
+    []
+  );
   const [innerEntries, setInnerEntries] = useState<InnerJournalEntry[]>([]);
+  const [rawInnerReflections, setRawInnerReflections] = useState<
+    InnerReflectionMemory[]
+  >([]);
   const [innerReflections, setInnerReflections] = useState<
     InnerReflectionMemory[]
   >([]);
@@ -109,6 +134,12 @@ export default function App() {
     useState<GardenCustomisationSettings>(() => loadLocalGardenCustomisation());
 
   const visitedStoryIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    return subscribeVaultLockState((unlocked) => {
+      setVaultUnlocked(unlocked);
+    });
+  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeToApprovedStories((loadedStories) => {
@@ -135,11 +166,15 @@ export default function App() {
 
   useEffect(() => {
     if (!currentUser) {
+      clearActiveVaultPassphrase();
       setSecretMembership(null);
+      setRawDiaryEntries([]);
       setDiaryEntries([]);
       setVoiceJournals([]);
       setMemories([]);
+      setRawInnerEntries([]);
       setInnerEntries([]);
+      setRawInnerReflections([]);
       setInnerReflections([]);
       setInnerPrivacyPrefs(null);
       return;
@@ -158,7 +193,7 @@ export default function App() {
 
     const unsubDiary = subscribeToPersonalDiary(
       currentUser.uid,
-      setDiaryEntries,
+      setRawDiaryEntries,
       () => {}
     );
     const unsubVoice = subscribeToVoiceJournals(
@@ -173,12 +208,12 @@ export default function App() {
     );
     const unsubInnerEntries = subscribeToInnerJournalEntries(
       currentUser.uid,
-      setInnerEntries,
+      setRawInnerEntries,
       () => {}
     );
     const unsubInnerReflections = subscribeToInnerReflections(
       currentUser.uid,
-      setInnerReflections,
+      setRawInnerReflections,
       () => {}
     );
     const unsubInnerPrefs = subscribeToInnerPrivacyPrefs(
@@ -197,6 +232,74 @@ export default function App() {
       unsubInnerPrefs();
     };
   }, [currentUser]);
+
+  // Derive decrypted views in-browser whenever raw Firestore snapshots or in-memory passphrase change
+  useEffect(() => {
+    let cancelled = false;
+    const pass = vaultUnlocked ? getActiveVaultPassphrase() : null;
+
+    const runDecrypt = async () => {
+      const [decDiary, decInner, decReflections] = await Promise.all([
+        Promise.all(
+          rawDiaryEntries.map(async (entry) => {
+            const res = await tryDecryptStoredText(entry.content, pass);
+            return res.text === entry.content
+              ? entry
+              : { ...entry, content: res.text };
+          })
+        ),
+        Promise.all(
+          rawInnerEntries.map(async (entry) => {
+            if (!entry.transcript) return entry;
+            const res = await tryDecryptStoredText(entry.transcript, pass);
+            return res.text === entry.transcript
+              ? entry
+              : { ...entry, transcript: res.text };
+          })
+        ),
+        Promise.all(
+          rawInnerReflections.map(async (refl) => {
+            const res = await tryDecryptStoredText(refl.reflectionText, pass);
+            return res.text === refl.reflectionText
+              ? refl
+              : { ...refl, reflectionText: res.text };
+          })
+        ),
+      ]);
+
+      if (!cancelled) {
+        setDiaryEntries(decDiary);
+        setInnerEntries(decInner);
+        setInnerReflections(decReflections);
+      }
+    };
+
+    void runDecrypt();
+    return () => {
+      cancelled = true;
+    };
+  }, [rawDiaryEntries, rawInnerEntries, rawInnerReflections, vaultUnlocked]);
+
+  const lockedDiaryCount = useMemo(
+    () => diaryEntries.filter((d) => isLockedVaultText(d.content)).length,
+    [diaryEntries]
+  );
+
+  const lockedInnerCount = useMemo(
+    () =>
+      innerEntries.filter((e) => isLockedVaultText(e.transcript)).length +
+      innerReflections.filter((r) => isLockedVaultText(r.reflectionText))
+        .length,
+    [innerEntries, innerReflections]
+  );
+
+  const openPrivacyTrustModal = useCallback(
+    (tab: PrivacyTrustTab = 'overview') => {
+      setPrivacyModalTab(tab);
+      setIsPrivacyModalOpen(true);
+    },
+    []
+  );
 
   const handleSelectStory = useCallback((story: Story) => {
     visitedStoryIdsRef.current.add(story.storyId);
@@ -381,6 +484,21 @@ export default function App() {
                   className="py-1 hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
                 >
                   How It Works
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openPrivacyTrustModal('overview')}
+                  className="inline-flex items-center gap-1 py-1 hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
+                  title="Inspect Unsaid Privacy, Zero-Knowledge Vault & Data Ownership"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-100 shrink-0" />
+                  <span>Privacy</span>
+                  {vaultUnlocked && (
+                    <span
+                      className="w-1.5 h-1.5 rounded-full bg-emerald-300 shrink-0"
+                      aria-label="Zero-Knowledge Vault unlocked"
+                    />
+                  )}
                 </button>
                 <button
                   type="button"
@@ -590,6 +708,8 @@ export default function App() {
         voiceJournals={voiceJournals}
         memories={memories}
         gardenCustomisation={activeGardenCustomisation}
+        lockedEncryptedCount={lockedDiaryCount}
+        onOpenPrivacyTrust={openPrivacyTrustModal}
         onUpdateCustomisation={handleUpdateCustomisation}
         onOpenUpgrade={handleOpenUpgrade}
         onClose={() => setIsMySpaceOpen(false)}
@@ -614,7 +734,27 @@ export default function App() {
         entries={innerEntries}
         reflections={innerReflections}
         prefs={innerPrivacyPrefs}
+        lockedEncryptedCount={lockedInnerCount}
+        onOpenPrivacyTrust={openPrivacyTrustModal}
         onClose={() => setIsInnerGardenOpen(false)}
+      />
+
+      {/* 12. Privacy & Trust Verification Shield + Zero-Knowledge Vault + Export/Wipe */}
+      <PrivacyTrustModal
+        isOpen={isPrivacyModalOpen}
+        initialTab={privacyModalTab}
+        currentUser={currentUser}
+        vaultUnlocked={vaultUnlocked}
+        rawDiaryEntries={rawDiaryEntries}
+        rawInnerEntries={rawInnerEntries}
+        rawInnerReflections={rawInnerReflections}
+        decryptedDiaryEntries={diaryEntries}
+        decryptedInnerEntries={innerEntries}
+        decryptedInnerReflections={innerReflections}
+        voiceJournals={voiceJournals}
+        memories={memories}
+        innerPrivacyPrefs={innerPrivacyPrefs}
+        onClose={() => setIsPrivacyModalOpen(false)}
       />
     </div>
   );

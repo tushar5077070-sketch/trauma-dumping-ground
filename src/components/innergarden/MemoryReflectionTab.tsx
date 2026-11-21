@@ -30,6 +30,7 @@ import {
   updateInnerReflectionMemory,
 } from '../../services/innerGardenService';
 import { addDaysIso, getTodayIsoDate } from '../../services/secretGardenService';
+import { isLockedVaultText } from '../../utils/vaultCrypto';
 
 interface MemoryReflectionTabProps {
   userId: string;
@@ -92,6 +93,7 @@ export const MemoryReflectionTab: React.FC<MemoryReflectionTabProps> = ({
     return entries.filter((e) => {
       if (!e.allowAiAnalysis) return false;
       if (!e.transcript || e.transcript.trim().length < 5) return false;
+      if (isLockedVaultText(e.transcript)) return false;
       const d = e.recordedDate || getTodayIsoDate();
       return d >= windowBounds.start && d <= windowBounds.end;
     });
@@ -368,6 +370,7 @@ export const MemoryReflectionTab: React.FC<MemoryReflectionTabProps> = ({
           <div className="space-y-4">
             {reflections.map((refl) => {
               const isEditing = editingReflectionId === refl.reflectionId;
+              const reflIsLocked = isLockedVaultText(refl.reflectionText);
               return (
                 <article
                   key={refl.reflectionId}
@@ -396,19 +399,21 @@ export const MemoryReflectionTab: React.FC<MemoryReflectionTabProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingReflectionId(refl.reflectionId);
-                          setEditTitle(refl.title);
-                          setEditText(refl.reflectionText);
-                          setEditTakeaway(refl.gentleTakeaway);
-                        }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs text-slate-700 cursor-pointer"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                        <span>Edit</span>
-                      </button>
+                      {!reflIsLocked && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingReflectionId(refl.reflectionId);
+                            setEditTitle(refl.title);
+                            setEditText(refl.reflectionText);
+                            setEditTakeaway(refl.gentleTakeaway);
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs text-slate-700 cursor-pointer"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                      )}
 
                       <button
                         type="button"

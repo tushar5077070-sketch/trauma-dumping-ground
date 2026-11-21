@@ -20,6 +20,7 @@ import {
 } from '../../services/innerGardenAiService';
 import { updateInnerJournalEntry } from '../../services/innerGardenService';
 import { addDaysIso, getTodayIsoDate } from '../../services/secretGardenService';
+import { isLockedVaultText } from '../../utils/vaultCrypto';
 
 interface EmotionalPatternsTabProps {
   userId: string;
@@ -47,7 +48,11 @@ export const EmotionalPatternsTab: React.FC<EmotionalPatternsTabProps> = ({
   const optedInWithText = useMemo(
     () =>
       entries.filter(
-        (e) => e.allowAiAnalysis && e.transcript && e.transcript.trim().length >= 5
+        (e) =>
+          e.allowAiAnalysis &&
+          e.transcript &&
+          e.transcript.trim().length >= 5 &&
+          !isLockedVaultText(e.transcript)
       ),
     [entries]
   );

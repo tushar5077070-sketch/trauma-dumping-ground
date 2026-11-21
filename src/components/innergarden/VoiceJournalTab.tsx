@@ -13,6 +13,7 @@ import {
   FileAudio,
   FileText,
   VolumeX,
+  Lock,
 } from 'lucide-react';
 import {
   InnerAiServerStatus,
@@ -35,6 +36,7 @@ import {
   updateInnerJournalEntry,
 } from '../../services/innerGardenService';
 import { getTodayIsoDate } from '../../services/secretGardenService';
+import { isLockedVaultText } from '../../utils/vaultCrypto';
 
 interface VoiceJournalTabProps {
   userId: string;
@@ -924,6 +926,7 @@ export const VoiceJournalTab: React.FC<VoiceJournalTabProps> = ({
               const isEditing = editingEntryId === entry.entryId;
               const hasAudio = Boolean(entry.audioDataUrl);
               const hasTranscript = Boolean(entry.transcript.trim());
+              const isLocked = isLockedVaultText(entry.transcript);
 
               return (
                 <article
@@ -968,18 +971,20 @@ export const VoiceJournalTab: React.FC<VoiceJournalTabProps> = ({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingEntryId(entry.entryId);
-                          setEditTitle(entry.title);
-                          setEditTranscript(entry.transcript);
-                        }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs text-slate-700 cursor-pointer"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                        <span>Edit</span>
-                      </button>
+                      {!isLocked && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingEntryId(entry.entryId);
+                            setEditTitle(entry.title);
+                            setEditTranscript(entry.transcript);
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs text-slate-700 cursor-pointer"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                      )}
 
                       {hasAudio && hasTranscript && (
                         <>
@@ -1069,11 +1074,17 @@ export const VoiceJournalTab: React.FC<VoiceJournalTabProps> = ({
                         </div>
                       )}
 
-                      {hasTranscript && (
-                        <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                          {entry.transcript}
-                        </p>
-                      )}
+                      {hasTranscript &&
+                        (isLocked ? (
+                          <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50/70 border border-amber-200/70 text-xs text-amber-950">
+                            <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
+                            <span>{entry.transcript}</span>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                            {entry.transcript}
+                          </p>
+                        ))}
 
                       {entry.aiReflection && (
                         <div className="p-3.5 rounded-xl bg-emerald-50/55 border border-emerald-200/70 space-y-1">

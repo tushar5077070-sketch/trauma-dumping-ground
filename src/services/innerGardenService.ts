@@ -21,6 +21,7 @@ import {
   InnerStorageChoice,
 } from '../types/garden';
 import { getTodayIsoDate } from './secretGardenService';
+import { maybeEncryptForStorage } from '../utils/vaultCrypto';
 
 function sanitizeId(raw: string): string {
   const cleaned = raw.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
@@ -255,14 +256,16 @@ export async function createInnerJournalEntry(
     );
   }
 
-  const cleanTranscript =
-    input.storageChoice === 'audio'
-      ? ''
-      : (input.transcript || '').trim().slice(0, 8000);
+  const rawTranscript =
+    input.storageChoice === 'audio' ? '' : (input.transcript || '').trim();
 
-  if (input.storageChoice !== 'audio' && cleanTranscript.length === 0 && !cleanAudio) {
+  if (input.storageChoice !== 'audio' && rawTranscript.length === 0 && !cleanAudio) {
     throw new Error('Please write or transcribe your journal thought before saving.');
   }
+
+  const cleanTranscript = rawTranscript
+    ? await maybeEncryptForStorage(rawTranscript, 8000)
+    : '';
 
   const { emotionLabels, emotionIntensities } = splitEmotions(input.emotions);
   const clampedDuration = Math.max(
@@ -334,8 +337,11 @@ export async function updateInnerJournalEntry(
     payload.storageChoice = updates.storageChoice;
   if (updates.title !== undefined)
     payload.title = updates.title.trim().slice(0, 140);
-  if (updates.transcript !== undefined)
-    payload.transcript = updates.transcript.trim().slice(0, 8000);
+  if (updates.transcript !== undefined) {
+    payload.transcript = updates.transcript.trim()
+      ? await maybeEncryptForStorage(updates.transcript, 8000)
+      : '';
+  }
   if (updates.durationSeconds !== undefined)
     payload.durationSeconds = Math.max(
       0,
@@ -468,6 +474,11 @@ export async function createInnerReflectionMemory(
   const reflectionId = `refl_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const path = `userAccounts/${uid}/innerReflections/${reflectionId}`;
 
+  const storedReflectionText = await maybeEncryptForStorage(
+    input.reflectionText,
+    4000
+  );
+
   try {
     await setDoc(doc(db, 'userAccounts', uid, 'innerReflections', reflectionId), {
       reflectionId,
@@ -477,7 +488,7 @@ export async function createInnerReflectionMemory(
       periodStart: input.periodStart.slice(0, 40),
       periodEnd: input.periodEnd.slice(0, 40),
       title: input.title.trim().slice(0, 140) || 'Garden Reflection',
-      reflectionText: input.reflectionText.trim().slice(0, 4000),
+      reflectionText: storedReflectionText,
       gentleTakeaway: input.gentleTakeaway.trim().slice(0, 400),
       recurringThemes: input.recurringThemes
         .slice(0, 8)
@@ -507,10 +518,14 @@ export async function updateInnerReflectionMemory(
   const uid = sanitizeId(userId);
   const cleanId = sanitizeId(reflectionId);
   const path = `userAccounts/${uid}/innerReflections/${cleanId}`;
+  const storedReflectionText = await maybeEncryptForStorage(
+    updates.reflectionText,
+    4000
+  );
   try {
     await updateDoc(doc(db, 'userAccounts', uid, 'innerReflections', cleanId), {
       title: updates.title.trim().slice(0, 140),
-      reflectionText: updates.reflectionText.trim().slice(0, 4000),
+      reflectionText: storedReflectionText,
       gentleTakeaway: updates.gentleTakeaway.trim().slice(0, 400),
       updatedAt: serverTimestamp(),
     });

@@ -32,6 +32,7 @@ import {
   SupportiveMessage,
   VoiceJournal,
 } from '../types/garden';
+import { maybeEncryptForStorage } from '../utils/vaultCrypto';
 
 const LOCAL_CUSTOMISATION_KEY = 'tdg_free_garden_customisation_v1';
 
@@ -424,12 +425,13 @@ export async function createDiaryEntry(
   const uid = sanitizeId(userId);
   const entryId = `diary_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const path = `userAccounts/${uid}/personalDiary/${entryId}`;
+  const storedContent = await maybeEncryptForStorage(input.content, 5000);
   try {
     await setDoc(doc(db, 'userAccounts', uid, 'personalDiary', entryId), {
       entryId,
       userId: uid,
       title: input.title.trim().slice(0, 120),
-      content: input.content.trim().slice(0, 5000),
+      content: storedContent,
       moodTag: input.moodTag.trim().slice(0, 40) || 'Quiet',
       entryDate: input.entryDate.trim().slice(0, 40) || getTodayIsoDate(),
       isMemorySaved: false,
@@ -456,10 +458,11 @@ export async function updateDiaryEntry(
   const uid = sanitizeId(userId);
   const cleanEntryId = sanitizeId(entryId);
   const path = `userAccounts/${uid}/personalDiary/${cleanEntryId}`;
+  const storedContent = await maybeEncryptForStorage(input.content, 5000);
   try {
     const payload: Record<string, unknown> = {
       title: input.title.trim().slice(0, 120),
-      content: input.content.trim().slice(0, 5000),
+      content: storedContent,
       moodTag: input.moodTag.trim().slice(0, 40) || 'Quiet',
       entryDate: input.entryDate.trim().slice(0, 40) || getTodayIsoDate(),
       updatedAt: serverTimestamp(),

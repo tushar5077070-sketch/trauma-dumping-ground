@@ -8,6 +8,7 @@ import {
   BarChart3,
   LogIn,
   ShieldCheck,
+  Lock,
 } from 'lucide-react';
 import {
   InnerAiServerStatus,
@@ -22,6 +23,8 @@ import { VoiceJournalTab } from './innergarden/VoiceJournalTab';
 import { MemoryReflectionTab } from './innergarden/MemoryReflectionTab';
 import { EmotionalPatternsTab } from './innergarden/EmotionalPatternsTab';
 
+import { PrivacyTrustTab } from './PrivacyTrustModal';
+
 export type InnerGardenTabKey = 'voice' | 'memory' | 'patterns';
 
 interface InnerGardenModalProps {
@@ -30,6 +33,8 @@ interface InnerGardenModalProps {
   entries: InnerJournalEntry[];
   reflections: InnerReflectionMemory[];
   prefs: InnerPrivacyPrefs | null;
+  lockedEncryptedCount: number;
+  onOpenPrivacyTrust: (tab?: PrivacyTrustTab) => void;
   onClose: () => void;
 }
 
@@ -39,6 +44,8 @@ export const InnerGardenModal: React.FC<InnerGardenModalProps> = ({
   entries,
   reflections,
   prefs,
+  lockedEncryptedCount,
+  onOpenPrivacyTrust,
   onClose,
 }) => {
   const [activeTab, setActiveTab] = useState<InnerGardenTabKey>('voice');
@@ -201,6 +208,29 @@ export const InnerGardenModal: React.FC<InnerGardenModalProps> = ({
             </div>
           ) : (
             <>
+              {lockedEncryptedCount > 0 && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-amber-50/90 border border-amber-200/90">
+                  <div className="flex items-start gap-2.5 text-xs text-amber-950">
+                    <Lock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                    <span>
+                      <strong className="font-semibold tabular-nums">
+                        {lockedEncryptedCount}
+                      </strong>{' '}
+                      private Inner Garden{' '}
+                      {lockedEncryptedCount === 1 ? 'record is' : 'records are'}{' '}
+                      Zero-Knowledge encrypted. Unlock with your passphrase to read or run AI reflections.
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onOpenPrivacyTrust('encryption')}
+                    className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium cursor-pointer shrink-0 self-start sm:self-auto"
+                  >
+                    Unlock Vault
+                  </button>
+                </div>
+              )}
+
               <PrivacyConsentBanner
                 userId={currentUser.uid}
                 prefs={prefs}
@@ -248,10 +278,19 @@ export const InnerGardenModal: React.FC<InnerGardenModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-7 py-3 bg-white/95 border-t border-slate-200/75">
-          <p className="text-[11px] text-slate-500">
-            Owner-only private vault · Never visible in the public garden
-          </p>
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 px-4 sm:px-7 py-3 bg-white/95 border-t border-slate-200/75">
+          <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+            <span>Owner-only private vault · Never visible in the public garden</span>
+            <span aria-hidden="true">·</span>
+            <button
+              type="button"
+              onClick={() => onOpenPrivacyTrust('encryption')}
+              className="inline-flex items-center gap-1 font-medium text-emerald-800 hover:underline underline-offset-2 cursor-pointer"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Privacy &amp; Vault</span>
+            </button>
+          </div>
           <button
             type="button"
             onClick={onClose}

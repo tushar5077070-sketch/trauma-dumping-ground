@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { User } from 'firebase/auth';
 import {
-  Sparkles,
   Check,
   X,
   Lock,
@@ -191,7 +190,7 @@ export const SecretGardenUpgradeModal: React.FC<
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-5 rounded-2xl bg-white border border-rose-100 shadow-2xs space-y-3">
               <div className="flex items-center gap-2 text-xs font-semibold text-rose-800">
-                <Sparkles className="w-4 h-4 text-rose-500" />
+                <Flower2 className="w-4 h-4 text-rose-500" />
                 <span>Inside The Secret Garden</span>
               </div>
               <ul className="space-y-2 text-xs sm:text-sm text-slate-700">
@@ -380,7 +379,7 @@ export const SecretGardenUpgradeModal: React.FC<
                   disabled={isSubmitting}
                   className="w-full py-3.5 px-6 rounded-2xl bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white text-sm font-medium inline-flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
                 >
-                  <Sparkles className="w-4 h-4 text-amber-200" />
+                  <Flower2 className="w-4 h-4 text-amber-200" />
                   <span>
                     {isSubmitting
                       ? 'Opening your space...'

@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { X, ShieldCheck, AlertCircle, Sparkles, Check } from 'lucide-react';
-import { SEED_OPTIONS, SeedType, Story } from '../types/garden';
+import { X, ShieldCheck, AlertCircle, Sprout, Check } from 'lucide-react';
 import {
-  generateAnonymousSoulId,
+  AmbientMeadowFlower,
+  SEED_OPTIONS,
+  SeedType,
+  Story,
+} from '../types/garden';
+import {
   pickFlowerVariantForSeed,
   plantNewStory,
 } from '../services/gardenService';
@@ -18,6 +22,7 @@ interface WriteStoryModalProps {
   selectedSeed: SeedType;
   onSelectSeed: (seed: SeedType) => void;
   existingStories: Story[];
+  targetFlower?: AmbientMeadowFlower | null;
   onClose: () => void;
   onStoryPlanted: (newStory: Story) => void;
 }
@@ -27,6 +32,7 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
   selectedSeed,
   onSelectSeed,
   existingStories,
+  targetFlower,
   onClose,
   onStoryPlanted,
 }) => {
@@ -34,9 +40,6 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
   const [contentWarning, setContentWarning] = useState('');
   const [showContentWarningInput, setShowContentWarningInput] = useState(false);
   const [anonymousConfirmed, setAnonymousConfirmed] = useState(true);
-  const [anonymousId, setAnonymousId] = useState(() =>
-    generateAnonymousSoulId()
-  );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [phase, setPhase] = useState<PlantingPhase>('writing');
@@ -47,7 +50,6 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
       setPhase('writing');
       setErrorMsg(null);
       setIsSubmitting(false);
-      setAnonymousId(generateAnonymousSoulId());
     }
   }, [isOpen]);
 
@@ -81,8 +83,8 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
         content,
         seedType: selectedSeed,
         contentWarning: showContentWarningInput ? contentWarning : '',
-        anonymousId,
         existingStories,
+        targetFlower,
       });
       setPlantedStory(created);
       soundscape.playBloomChord();
@@ -129,7 +131,7 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
           <div className="shrink-0 flex items-start justify-between gap-4 px-4 sm:px-7 pt-4 sm:pt-6 pb-3 border-b border-slate-200/60">
             <div>
               <p className="text-[11px] sm:text-xs font-medium text-slate-500">
-                {currentSeed.numberLabel} · {currentSeed.name} · {anonymousId}
+                {currentSeed.numberLabel} · {currentSeed.name} · Completely Anonymous
               </p>
               <h2
                 id="write-story-heading"
@@ -288,11 +290,7 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                   Anonymous Sanctuary Promise
                 </span>
-                Your story will be planted anonymously as{' '}
-                <span className="font-medium text-slate-800">
-                  {anonymousId}
-                </span>
-                . No name, email, or personal identity is ever collected or displayed.
+                Your story will be planted completely anonymously — with no username, profile, or tracking ID ever shown. No name, email, or personal identity is ever collected or displayed.
               </div>
             </label>
 
@@ -319,7 +317,7 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
               disabled={isSubmitting}
               className="px-5 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-medium flex items-center gap-2 shadow-sm transition-colors cursor-pointer whitespace-nowrap"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+              <Sprout className="w-3.5 h-3.5 text-emerald-300" />
               <span>{isSubmitting ? 'Planting Seed...' : 'Plant My Seed'}</span>
             </button>
           </div>
@@ -352,7 +350,7 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
                     'Blooming gently into the meadow...'}
                 </p>
                 <p className="text-xs text-slate-500 mt-1.5">
-                  Planting {currentSeed.name} · {anonymousId}
+                  Planting {currentSeed.name} · Anonymous bloom
                 </p>
               </>
             ) : (

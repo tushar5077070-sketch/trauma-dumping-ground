@@ -192,7 +192,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   <span>Your planted stories always stay anonymous</span>
                 </div>
                 <p className="text-xs text-sky-900/80 leading-relaxed">
-                  Signing in links your visitor account and displays any subscription plan assigned to you. Any stories you plant in the meadow continue to use an anonymous soul ID with zero personal details exposed.
+                  Signing in links your visitor account and displays any subscription plan assigned to you. Any stories you plant in the meadow stay completely anonymous with no username, ID number, or personal details ever displayed.
                 </p>
               </div>
 

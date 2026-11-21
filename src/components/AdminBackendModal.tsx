@@ -38,6 +38,7 @@ import {
   subscribeToAllUserAccounts,
   updateSubscriptionPlan,
 } from '../services/authAccountService';
+import { purgeLegacyGardenStories } from '../services/gardenService';
 
 interface AdminBackendModalProps {
   isOpen: boolean;
@@ -108,6 +109,11 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
   } | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [backendError, setBackendError] = useState<string | null>(null);
+  const [confirmPurgeLegacy, setConfirmPurgeLegacy] = useState(false);
+  const [isPurgingLegacy, setIsPurgingLegacy] = useState(false);
+  const [purgeLegacyResult, setPurgeLegacyResult] = useState<string | null>(
+    null
+  );
 
   const isAdmin = isVerifiedAdminUser(currentUser);
 
@@ -983,10 +989,56 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
         </div>
 
         {/* Pinned Footer */}
-        <div className="shrink-0 flex items-center justify-between gap-3 px-4 sm:px-7 py-3 bg-white/95 border-t border-slate-200/70">
-          <span className="text-[11px] text-slate-500">
-            Synced live with Cloud Firestore
-          </span>
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 px-4 sm:px-7 py-3 bg-white/95 border-t border-slate-200/70">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-[11px] text-slate-500">
+              Synced live with Cloud Firestore
+            </span>
+            <button
+              type="button"
+              disabled={isPurgingLegacy}
+              onClick={async () => {
+                if (!confirmPurgeLegacy) {
+                  setConfirmPurgeLegacy(true);
+                  setPurgeLegacyResult(null);
+                  return;
+                }
+                setIsPurgingLegacy(true);
+                setPurgeLegacyResult(null);
+                try {
+                  const res = await purgeLegacyGardenStories();
+                  setPurgeLegacyResult(
+                    res.deletedCount > 0
+                      ? `Deleted ${res.deletedCount} legacy pre-launch stories from Firestore.`
+                      : 'No legacy pre-launch stories found in Firestore.'
+                  );
+                } catch {
+                  setPurgeLegacyResult(
+                    'Could not purge legacy stories. Verify admin sign-in.'
+                  );
+                } finally {
+                  setIsPurgingLegacy(false);
+                  setConfirmPurgeLegacy(false);
+                }
+              }}
+              className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-colors cursor-pointer disabled:opacity-50 ${
+                confirmPurgeLegacy
+                  ? 'bg-rose-600 text-white border-rose-700'
+                  : 'bg-slate-50 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border-slate-200'
+              }`}
+            >
+              {isPurgingLegacy
+                ? 'Purging...'
+                : confirmPurgeLegacy
+                ? 'Click again to delete pre-launch DB stories'
+                : 'Purge Legacy DB Stories'}
+            </button>
+            {purgeLegacyResult && (
+              <span className="text-[11px] font-medium text-emerald-700">
+                {purgeLegacyResult}
+              </span>
+            )}
+          </div>
           <button
             type="button"
             onClick={onClose}

@@ -258,7 +258,7 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
                 id="story-soul-heading"
                 className="font-editorial text-xl sm:text-3xl font-semibold text-slate-900 leading-tight"
               >
-                {story.anonymousId}
+                Anonymous Soul
               </h2>
 
               <div className="flex items-center gap-2 text-[11px] sm:text-xs text-slate-500 mt-0.5">
@@ -372,7 +372,7 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
                   htmlFor="kind-message-input"
                   className="text-xs font-medium text-slate-700"
                 >
-                  Write a gentle, supportive note for {story.anonymousId}
+                  Write a gentle, supportive note for this author
                 </label>
                 <span className="text-[11px] font-mono tabular-nums text-slate-400">
                   {messageText.length} / 500
@@ -431,7 +431,7 @@ export const StoryReaderModal: React.FC<StoryReaderModalProps> = ({
                       <div className="flex items-center justify-between gap-2 mb-0.5">
                         <div className="flex items-center gap-2 text-[11px] text-slate-500">
                           <span className="font-semibold text-slate-700">
-                            {msg.anonymousId}
+                            Kind Gardener
                           </span>
                           <span aria-hidden="true">·</span>
                           <span>{formatRelativeTime(msg.createdAt)}</span>

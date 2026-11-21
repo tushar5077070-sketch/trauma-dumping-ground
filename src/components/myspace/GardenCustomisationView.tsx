@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Palette,
-  Sparkles,
   Flower2,
   Sun,
   Lock,
@@ -215,7 +214,7 @@ export const GardenCustomisationView: React.FC<GardenCustomisationViewProps> = (
       {/* 3. Subtle Visual Effects */}
       <section className="space-y-2.5">
         <h3 className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+          <Flower2 className="w-3.5 h-3.5 text-amber-500" />
           <span>Ambient Garden Effects</span>
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

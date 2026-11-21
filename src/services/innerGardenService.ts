@@ -21,7 +21,6 @@ import {
   InnerStorageChoice,
 } from '../types/garden';
 import { getTodayIsoDate } from './secretGardenService';
-import { maybeEncryptForStorage } from '../utils/vaultCrypto';
 
 function sanitizeId(raw: string): string {
   const cleaned = raw.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64);
@@ -263,9 +262,7 @@ export async function createInnerJournalEntry(
     throw new Error('Please write or transcribe your journal thought before saving.');
   }
 
-  const cleanTranscript = rawTranscript
-    ? await maybeEncryptForStorage(rawTranscript, 8000)
-    : '';
+  const cleanTranscript = rawTranscript ? rawTranscript.slice(0, 8000) : '';
 
   const { emotionLabels, emotionIntensities } = splitEmotions(input.emotions);
   const clampedDuration = Math.max(
@@ -338,9 +335,7 @@ export async function updateInnerJournalEntry(
   if (updates.title !== undefined)
     payload.title = updates.title.trim().slice(0, 140);
   if (updates.transcript !== undefined) {
-    payload.transcript = updates.transcript.trim()
-      ? await maybeEncryptForStorage(updates.transcript, 8000)
-      : '';
+    payload.transcript = updates.transcript.trim().slice(0, 8000);
   }
   if (updates.durationSeconds !== undefined)
     payload.durationSeconds = Math.max(
@@ -474,10 +469,7 @@ export async function createInnerReflectionMemory(
   const reflectionId = `refl_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const path = `userAccounts/${uid}/innerReflections/${reflectionId}`;
 
-  const storedReflectionText = await maybeEncryptForStorage(
-    input.reflectionText,
-    4000
-  );
+  const storedReflectionText = input.reflectionText.trim().slice(0, 4000);
 
   try {
     await setDoc(doc(db, 'userAccounts', uid, 'innerReflections', reflectionId), {
@@ -518,10 +510,7 @@ export async function updateInnerReflectionMemory(
   const uid = sanitizeId(userId);
   const cleanId = sanitizeId(reflectionId);
   const path = `userAccounts/${uid}/innerReflections/${cleanId}`;
-  const storedReflectionText = await maybeEncryptForStorage(
-    updates.reflectionText,
-    4000
-  );
+  const storedReflectionText = updates.reflectionText.trim().slice(0, 4000);
   try {
     await updateDoc(doc(db, 'userAccounts', uid, 'innerReflections', cleanId), {
       title: updates.title.trim().slice(0, 140),

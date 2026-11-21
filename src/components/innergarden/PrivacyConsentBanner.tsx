@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Mic, Sparkles, AlertTriangle, Check } from 'lucide-react';
+import { ShieldCheck, Mic, Feather, AlertTriangle, Check } from 'lucide-react';
 import { InnerAiServerStatus, InnerPrivacyPrefs } from '../../types/garden';
 import { saveInnerPrivacyPrefs } from '../../services/innerGardenService';
 
@@ -129,7 +129,7 @@ export const PrivacyConsentBanner: React.FC<PrivacyConsentBannerProps> = ({
           }`}
         >
           <div className="flex items-center gap-2.5 min-w-0">
-            <Sparkles className="w-4 h-4 text-emerald-700 shrink-0" />
+            <Feather className="w-4 h-4 text-emerald-700 shrink-0" />
             <div className="min-w-0">
               <p className="text-xs font-semibold truncate">
                 Gemini AI Transcription & Reflections

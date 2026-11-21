@@ -18,7 +18,6 @@ import {
   saveDiaryEntryAsMemory,
   updateDiaryEntry,
 } from '../../services/secretGardenService';
-import { isLockedVaultText } from '../../utils/vaultCrypto';
 
 interface PersonalDiaryViewProps {
   userId: string;
@@ -305,9 +304,7 @@ export const PersonalDiaryView: React.FC<PersonalDiaryViewProps> = ({
           </div>
         ) : (
           <div className="space-y-3">
-            {entries.map((entry) => {
-              const entryIsLocked = isLockedVaultText(entry.content);
-              return (
+            {entries.map((entry) => (
                 <article
                   key={entry.entryId}
                   className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/80 shadow-2xs space-y-2.5"
@@ -329,49 +326,45 @@ export const PersonalDiaryView: React.FC<PersonalDiaryViewProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      {!entryIsLocked && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => handleBookmarkToMemory(entry)}
-                            title={
-                              entry.isMemorySaved
-                                ? 'Saved in My Memories'
-                                : 'Save to My Memories'
-                            }
-                            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] font-medium transition-colors cursor-pointer ${
-                              entry.isMemorySaved
-                                ? 'bg-amber-50 text-amber-800 border-amber-200'
-                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                            }`}
-                          >
-                            {entry.isMemorySaved ? (
-                              <>
-                                <BookmarkCheck className="w-3.5 h-3.5 text-amber-600" />
-                                <span className="hidden sm:inline">
-                                  In Memories
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                <Bookmark className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">
-                                  Save Memory
-                                </span>
-                              </>
-                            )}
-                          </button>
+                      <button
+                        type="button"
+                        onClick={() => handleBookmarkToMemory(entry)}
+                        title={
+                          entry.isMemorySaved
+                            ? 'Saved in My Memories'
+                            : 'Save to My Memories'
+                        }
+                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-[11px] font-medium transition-colors cursor-pointer ${
+                          entry.isMemorySaved
+                            ? 'bg-amber-50 text-amber-800 border-amber-200'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {entry.isMemorySaved ? (
+                          <>
+                            <BookmarkCheck className="w-3.5 h-3.5 text-amber-600" />
+                            <span className="hidden sm:inline">
+                              In Memories
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <Bookmark className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">
+                              Save Memory
+                            </span>
+                          </>
+                        )}
+                      </button>
 
-                          <button
-                            type="button"
-                            onClick={() => openEdit(entry)}
-                            className="p-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 transition-colors cursor-pointer"
-                            aria-label="Edit diary entry"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                        </>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => openEdit(entry)}
+                        className="p-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 transition-colors cursor-pointer"
+                        aria-label="Edit diary entry"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
 
                       <button
                         type="button"
@@ -390,16 +383,9 @@ export const PersonalDiaryView: React.FC<PersonalDiaryViewProps> = ({
                     </div>
                   </div>
 
-                  {entryIsLocked ? (
-                    <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-50/70 border border-amber-200/70 text-xs text-amber-950">
-                      <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
-                      <span>{entry.content}</span>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                      {entry.content}
-                    </p>
-                  )}
+                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                    {entry.content}
+                  </p>
 
                   <p className="text-[11px] text-slate-400">
                     Saved{' '}
@@ -411,8 +397,7 @@ export const PersonalDiaryView: React.FC<PersonalDiaryViewProps> = ({
                     })}
                   </p>
                 </article>
-              );
-            })}
+            ))}
           </div>
         )}
       </div>

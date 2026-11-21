@@ -32,7 +32,6 @@ import {
   SupportiveMessage,
   VoiceJournal,
 } from '../types/garden';
-import { maybeEncryptForStorage } from '../utils/vaultCrypto';
 
 const LOCAL_CUSTOMISATION_KEY = 'tdg_free_garden_customisation_v1';
 
@@ -425,7 +424,7 @@ export async function createDiaryEntry(
   const uid = sanitizeId(userId);
   const entryId = `diary_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const path = `userAccounts/${uid}/personalDiary/${entryId}`;
-  const storedContent = await maybeEncryptForStorage(input.content, 5000);
+  const storedContent = input.content.trim().slice(0, 5000);
   try {
     await setDoc(doc(db, 'userAccounts', uid, 'personalDiary', entryId), {
       entryId,
@@ -458,7 +457,7 @@ export async function updateDiaryEntry(
   const uid = sanitizeId(userId);
   const cleanEntryId = sanitizeId(entryId);
   const path = `userAccounts/${uid}/personalDiary/${cleanEntryId}`;
-  const storedContent = await maybeEncryptForStorage(input.content, 5000);
+  const storedContent = input.content.trim().slice(0, 5000);
   try {
     const payload: Record<string, unknown> = {
       title: input.title.trim().slice(0, 120),
@@ -695,8 +694,8 @@ export async function saveCommunityStoryMemory(
       userId: uid,
       sourceType: 'community_story',
       sourceId: cleanSourceId,
-      anonymousLabel: (story.anonymousId || 'Anonymous Soul').slice(0, 60),
-      title: `Flower planted by ${(story.anonymousId || 'Anonymous Soul').slice(0, 40)}`,
+      anonymousLabel: 'Anonymous Soul',
+      title: 'Anonymous flower in the meadow',
       excerpt: (story.content || 'A quiet story in the meadow.').slice(0, 2000),
       flowerVariant: (story.flowerVariant || 'pink-tulip').slice(0, 40),
       folder,
@@ -732,8 +731,8 @@ export async function saveSupportiveReplyMemory(
       userId: uid,
       sourceType: 'supportive_reply',
       sourceId: cleanSourceId,
-      anonymousLabel: (message.anonymousId || 'Kind Gardener').slice(0, 60),
-      title: `Kind note from ${(message.anonymousId || 'Kind Gardener').slice(0, 40)}`,
+      anonymousLabel: 'Kind Gardener',
+      title: 'Kind words from a visitor',
       excerpt: (message.content || '').slice(0, 2000),
       flowerVariant: (storyFlowerVariant || 'daisy').slice(0, 40),
       folder,

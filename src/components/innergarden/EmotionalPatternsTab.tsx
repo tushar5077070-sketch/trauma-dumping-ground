@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
   BarChart3,
-  Sparkles,
   Award,
   AlertCircle,
   Loader2,
@@ -20,7 +19,6 @@ import {
 } from '../../services/innerGardenAiService';
 import { updateInnerJournalEntry } from '../../services/innerGardenService';
 import { addDaysIso, getTodayIsoDate } from '../../services/secretGardenService';
-import { isLockedVaultText } from '../../utils/vaultCrypto';
 
 interface EmotionalPatternsTabProps {
   userId: string;
@@ -51,8 +49,7 @@ export const EmotionalPatternsTab: React.FC<EmotionalPatternsTabProps> = ({
         (e) =>
           e.allowAiAnalysis &&
           e.transcript &&
-          e.transcript.trim().length >= 5 &&
-          !isLockedVaultText(e.transcript)
+          e.transcript.trim().length >= 5
       ),
     [entries]
   );
@@ -323,7 +320,7 @@ export const EmotionalPatternsTab: React.FC<EmotionalPatternsTabProps> = ({
           {isAnalyzing ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
-            <Sparkles className="w-4 h-4 text-amber-200" />
+            <BarChart3 className="w-4 h-4 text-amber-200" />
           )}
           <span>
             {isAnalyzing

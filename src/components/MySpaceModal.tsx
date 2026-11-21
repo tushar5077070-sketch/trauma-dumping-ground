@@ -10,7 +10,7 @@ import {
   Palette,
   Lock,
   Crown,
-  Sparkles,
+  Check,
   Settings,
   ArrowLeft,
   ShieldCheck,
@@ -54,7 +54,6 @@ interface MySpaceModalProps {
   voiceJournals: VoiceJournal[];
   memories: SavedMemory[];
   gardenCustomisation: GardenCustomisationSettings;
-  lockedEncryptedCount: number;
   onOpenPrivacyTrust: (tab?: PrivacyTrustTab) => void;
   onUpdateCustomisation: (next: GardenCustomisationSettings) => Promise<void>;
   onOpenUpgrade: (featureName?: string) => void;
@@ -160,7 +159,6 @@ export const MySpaceModal: React.FC<MySpaceModalProps> = ({
   voiceJournals,
   memories,
   gardenCustomisation,
-  lockedEncryptedCount,
   onOpenPrivacyTrust,
   onUpdateCustomisation,
   onOpenUpgrade,
@@ -272,7 +270,7 @@ export const MySpaceModal: React.FC<MySpaceModalProps> = ({
                 onClick={() => onOpenUpgrade()}
                 className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition-colors cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+                <Crown className="w-3.5 h-3.5 text-amber-200" />
                 <span>Unlock Secret Garden</span>
               </button>
             )}
@@ -307,28 +305,6 @@ export const MySpaceModal: React.FC<MySpaceModalProps> = ({
 
         {/* Scrollable Sanctuary Content */}
         <div className="flex-1 min-h-0 overflow-y-auto garden-scroll px-4 sm:px-8 py-5 sm:py-7 space-y-6">
-          {currentUser && lockedEncryptedCount > 0 && (
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-amber-50/90 border border-amber-200/90">
-              <div className="flex items-start gap-2.5 text-xs text-amber-950">
-                <Lock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                <span>
-                  <strong className="font-semibold tabular-nums">
-                    {lockedEncryptedCount}
-                  </strong>{' '}
-                  diary {lockedEncryptedCount === 1 ? 'entry is' : 'entries are'}{' '}
-                  Zero-Knowledge encrypted. Unlock with your passphrase to read or edit.
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => onOpenPrivacyTrust('encryption')}
-                className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium cursor-pointer shrink-0 self-start sm:self-auto"
-              >
-                Unlock Vault
-              </button>
-            </div>
-          )}
-
           {activeView === 'overview' && (
             <>
               {/* Welcoming Heading & Privacy Promise */}
@@ -354,7 +330,7 @@ export const MySpaceModal: React.FC<MySpaceModalProps> = ({
                     onClick={() => onOpenUpgrade()}
                     className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-medium shadow-xs transition-all cursor-pointer shrink-0"
                   >
-                    <Sparkles className="w-4 h-4 text-amber-200" />
+                    <Crown className="w-4 h-4 text-amber-200" />
                     <span>Unlock The Secret Garden · 1st Month Free</span>
                   </button>
                 ) : (
@@ -564,7 +540,7 @@ export const MySpaceModal: React.FC<MySpaceModalProps> = ({
               <ul className="space-y-2 p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/70 text-xs text-slate-700">
                 {previewFeature.previewPoints.map((pt) => (
                   <li key={pt} className="flex items-start gap-2">
-                    <Sparkles className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
+                    <Check className="w-3.5 h-3.5 text-rose-500 shrink-0 mt-0.5" />
                     <span>{pt}</span>
                   </li>
                 ))}
@@ -580,7 +556,7 @@ export const MySpaceModal: React.FC<MySpaceModalProps> = ({
                   }}
                   className="flex-1 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-medium inline-flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Sparkles className="w-4 h-4 text-amber-200" />
+                  <Crown className="w-4 h-4 text-amber-200" />
                   <span>Unlock The Secret Garden</span>
                 </button>
                 <button
@@ -602,11 +578,11 @@ export const MySpaceModal: React.FC<MySpaceModalProps> = ({
             <span aria-hidden="true">·</span>
             <button
               type="button"
-              onClick={() => onOpenPrivacyTrust('encryption')}
+              onClick={() => onOpenPrivacyTrust('overview')}
               className="inline-flex items-center gap-1 font-medium text-emerald-800 hover:underline underline-offset-2 cursor-pointer"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Privacy &amp; Vault</span>
+              <span>Privacy &amp; Data</span>
             </button>
           </div>
           <button

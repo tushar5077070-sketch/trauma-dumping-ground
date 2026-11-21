@@ -8,6 +8,7 @@ interface InfoModalProps {
   onClose: () => void;
   onStartPlanting: () => void;
   totalFlowersCount: number;
+  plantedStoriesCount?: number;
 }
 
 export const InfoModals: React.FC<InfoModalProps> = ({
@@ -15,6 +16,7 @@ export const InfoModals: React.FC<InfoModalProps> = ({
   onClose,
   onStartPlanting,
   totalFlowersCount,
+  plantedStoriesCount = 0,
 }) => {
   if (!activeModal) return null;
 
@@ -30,7 +32,11 @@ export const InfoModals: React.FC<InfoModalProps> = ({
           <div>
             <p className="text-[11px] sm:text-xs font-medium text-slate-500">
               {activeModal === 'about'
-                ? `About the Sanctuary · ${totalFlowersCount} Living Flowers`
+                ? plantedStoriesCount > 0
+                  ? `About the Sanctuary · ${plantedStoriesCount} ${
+                      plantedStoriesCount === 1 ? 'Planted Story' : 'Planted Stories'
+                    } · ${totalFlowersCount} Living Flowers`
+                  : `About the Sanctuary · ${totalFlowersCount} Open Blooms Waiting for Stories`
                 : 'Guide to the Meadow'}
             </p>
             <h2 className="font-editorial text-2xl sm:text-4xl font-semibold text-slate-900 mt-0.5">
@@ -67,7 +73,7 @@ export const InfoModals: React.FC<InfoModalProps> = ({
                   Privacy & Compassion Principles
                 </h3>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Zero personal information is collected or displayed. Every flower is identified only by an anonymous soul number, and visitors can offer quiet warmth or a supportive note to remind authors they are not alone.
+                  Zero personal information is collected or displayed. Every flower blooms completely anonymously with no username or tracking ID shown, and visitors can offer quiet warmth or a supportive note to remind authors they are not alone.
                 </p>
               </div>
             </>

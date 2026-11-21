@@ -6,8 +6,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { User } from 'firebase/auth';
 import {
-  Volume2,
-  VolumeX,
   Flower2,
   Compass,
   LogIn,
@@ -16,10 +14,11 @@ import {
   Sprout,
 } from 'lucide-react';
 import {
+  AMBIENT_MEADOW_FLOWERS,
+  AmbientMeadowFlower,
   DEFAULT_GARDEN_CUSTOMISATION,
   DiaryEntry,
   GardenCustomisationSettings,
-  INITIAL_GARDEN_STORIES,
   InnerJournalEntry,
   InnerPrivacyPrefs,
   InnerReflectionMemory,
@@ -30,10 +29,7 @@ import {
   SupportiveMessage,
   VoiceJournal,
 } from './types/garden';
-import {
-  getInitialShuffledStories,
-  subscribeToApprovedStories,
-} from './services/gardenService';
+import { subscribeToApprovedStories } from './services/gardenService';
 import {
   ensureUserAccountSynced,
   isVerifiedAdminUser,
@@ -72,20 +68,12 @@ import {
   PrivacyTrustModal,
   PrivacyTrustTab,
 } from './components/PrivacyTrustModal';
-import {
-  clearActiveVaultPassphrase,
-  getActiveVaultPassphrase,
-  isLockedVaultText,
-  isVaultUnlocked,
-  subscribeVaultLockState,
-  tryDecryptStoredText,
-} from './utils/vaultCrypto';
 
 export default function App() {
-  const [stories, setStories] = useState<Story[]>(() =>
-    getInitialShuffledStories()
-  );
+  const [stories, setStories] = useState<Story[]>([]);
   const [selectedSeed, setSelectedSeed] = useState<SeedType>('daisy');
+  const [targetAmbientFlower, setTargetAmbientFlower] =
+    useState<AmbientMeadowFlower | null>(null);
   const [activeStory, setActiveStory] = useState<Story | null>(null);
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false);
   const [activeInfoModal, setActiveInfoModal] = useState<
@@ -94,7 +82,6 @@ export default function App() {
   const [highlightedStoryId, setHighlightedStoryId] = useState<string | null>(
     null
   );
-  const [isSoundEnabled, setIsSoundEnabled] = useState(false);
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
@@ -108,23 +95,13 @@ export default function App() {
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
   const [privacyModalTab, setPrivacyModalTab] =
     useState<PrivacyTrustTab>('overview');
-  const [vaultUnlocked, setVaultUnlocked] = useState<boolean>(() =>
-    isVaultUnlocked()
-  );
 
   const [secretMembership, setSecretMembership] =
     useState<SecretGardenMembership | null>(null);
-  const [rawDiaryEntries, setRawDiaryEntries] = useState<DiaryEntry[]>([]);
   const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
   const [voiceJournals, setVoiceJournals] = useState<VoiceJournal[]>([]);
   const [memories, setMemories] = useState<SavedMemory[]>([]);
-  const [rawInnerEntries, setRawInnerEntries] = useState<InnerJournalEntry[]>(
-    []
-  );
   const [innerEntries, setInnerEntries] = useState<InnerJournalEntry[]>([]);
-  const [rawInnerReflections, setRawInnerReflections] = useState<
-    InnerReflectionMemory[]
-  >([]);
   const [innerReflections, setInnerReflections] = useState<
     InnerReflectionMemory[]
   >([]);
@@ -134,12 +111,6 @@ export default function App() {
     useState<GardenCustomisationSettings>(() => loadLocalGardenCustomisation());
 
   const visitedStoryIdsRef = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    return subscribeVaultLockState((unlocked) => {
-      setVaultUnlocked(unlocked);
-    });
-  }, []);
 
   useEffect(() => {
     const unsubscribe = subscribeToApprovedStories((loadedStories) => {
@@ -166,15 +137,11 @@ export default function App() {
 
   useEffect(() => {
     if (!currentUser) {
-      clearActiveVaultPassphrase();
       setSecretMembership(null);
-      setRawDiaryEntries([]);
       setDiaryEntries([]);
       setVoiceJournals([]);
       setMemories([]);
-      setRawInnerEntries([]);
       setInnerEntries([]);
-      setRawInnerReflections([]);
       setInnerReflections([]);
       setInnerPrivacyPrefs(null);
       return;
@@ -193,7 +160,7 @@ export default function App() {
 
     const unsubDiary = subscribeToPersonalDiary(
       currentUser.uid,
-      setRawDiaryEntries,
+      setDiaryEntries,
       () => {}
     );
     const unsubVoice = subscribeToVoiceJournals(
@@ -208,12 +175,12 @@ export default function App() {
     );
     const unsubInnerEntries = subscribeToInnerJournalEntries(
       currentUser.uid,
-      setRawInnerEntries,
+      setInnerEntries,
       () => {}
     );
     const unsubInnerReflections = subscribeToInnerReflections(
       currentUser.uid,
-      setRawInnerReflections,
+      setInnerReflections,
       () => {}
     );
     const unsubInnerPrefs = subscribeToInnerPrivacyPrefs(
@@ -232,66 +199,6 @@ export default function App() {
       unsubInnerPrefs();
     };
   }, [currentUser]);
-
-  // Derive decrypted views in-browser whenever raw Firestore snapshots or in-memory passphrase change
-  useEffect(() => {
-    let cancelled = false;
-    const pass = vaultUnlocked ? getActiveVaultPassphrase() : null;
-
-    const runDecrypt = async () => {
-      const [decDiary, decInner, decReflections] = await Promise.all([
-        Promise.all(
-          rawDiaryEntries.map(async (entry) => {
-            const res = await tryDecryptStoredText(entry.content, pass);
-            return res.text === entry.content
-              ? entry
-              : { ...entry, content: res.text };
-          })
-        ),
-        Promise.all(
-          rawInnerEntries.map(async (entry) => {
-            if (!entry.transcript) return entry;
-            const res = await tryDecryptStoredText(entry.transcript, pass);
-            return res.text === entry.transcript
-              ? entry
-              : { ...entry, transcript: res.text };
-          })
-        ),
-        Promise.all(
-          rawInnerReflections.map(async (refl) => {
-            const res = await tryDecryptStoredText(refl.reflectionText, pass);
-            return res.text === refl.reflectionText
-              ? refl
-              : { ...refl, reflectionText: res.text };
-          })
-        ),
-      ]);
-
-      if (!cancelled) {
-        setDiaryEntries(decDiary);
-        setInnerEntries(decInner);
-        setInnerReflections(decReflections);
-      }
-    };
-
-    void runDecrypt();
-    return () => {
-      cancelled = true;
-    };
-  }, [rawDiaryEntries, rawInnerEntries, rawInnerReflections, vaultUnlocked]);
-
-  const lockedDiaryCount = useMemo(
-    () => diaryEntries.filter((d) => isLockedVaultText(d.content)).length,
-    [diaryEntries]
-  );
-
-  const lockedInnerCount = useMemo(
-    () =>
-      innerEntries.filter((e) => isLockedVaultText(e.transcript)).length +
-      innerReflections.filter((r) => isLockedVaultText(r.reflectionText))
-        .length,
-    [innerEntries, innerReflections]
-  );
 
   const openPrivacyTrustModal = useCallback(
     (tab: PrivacyTrustTab = 'overview') => {
@@ -342,11 +249,6 @@ export default function App() {
       )
     );
   }, []);
-
-  const handleToggleSound = () => {
-    const nextState = soundscape.toggle();
-    setIsSoundEnabled(nextState);
-  };
 
   const activeGardenCustomisation: GardenCustomisationSettings = useMemo(() => {
     if (!hasPremiumAccess) {
@@ -425,22 +327,35 @@ export default function App() {
     currentUser?.email?.split('@')[0] ||
     'Account';
 
+  const handleSelectEmptyFlower = useCallback((flower: AmbientMeadowFlower) => {
+    setSelectedSeed(flower.seedType);
+    setTargetAmbientFlower(flower);
+    setIsWriteModalOpen(true);
+  }, []);
+
+  const handleOpenGeneralPlanting = useCallback(() => {
+    setTargetAmbientFlower(null);
+    setIsWriteModalOpen(true);
+  }, []);
+
   return (
     <div className="relative w-full h-[100dvh] overflow-hidden select-none">
       {/* 1. Living 3D-like Flower Meadow & Sky Environment */}
       <LivingGardenCanvas
         stories={stories}
         onSelectStory={handleSelectStory}
+        onSelectEmptyFlower={handleSelectEmptyFlower}
         highlightedStoryId={highlightedStoryId}
         gardenCustomisation={activeGardenCustomisation}
       />
 
       {/* 2. Top Navigation & Sky Sanctuary Overlay — Responsive Across Mobile, Tablet (Portrait/Landscape) & Laptop */}
       <div className="pointer-events-none fixed inset-x-0 top-0 h-[52dvh] min-h-[240px] max-h-[520px] z-40 flex flex-col justify-between pb-2 sm:pb-4">
-        <header className="pointer-events-auto w-full px-3.5 sm:px-5 md:px-7 lg:px-10 py-2.5 sm:py-3.5 lg:py-4 bg-gradient-to-b from-slate-950/30 via-slate-900/12 to-transparent">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 md:gap-4">
-            {/* Top row on mobile / Left side on Tablet & Laptop: Brand + Mobile CTA */}
-            <div className="flex items-center justify-between gap-2 shrink-0">
+        <header className="pointer-events-auto w-full px-3 sm:px-5 md:px-7 lg:px-10 py-2.5 sm:py-3.5 lg:py-4 bg-gradient-to-b from-slate-950/30 via-slate-900/12 to-transparent">
+          {/* Mobile Header (< sm): Row 1 has Brand + About, How It Works, Privacy, Gmail/Sign In; Row 2 below has My Space & Plant a Seed */}
+          <div className="sm:hidden max-w-7xl mx-auto flex flex-col gap-2">
+            {/* Row 1: Brand on left + About, How It Works, Privacy & Gmail/Account on right */}
+            <div className="flex items-center justify-between gap-2">
               <a
                 href="#top"
                 onClick={(e) => {
@@ -449,27 +364,137 @@ export default function App() {
                   setIsWriteModalOpen(false);
                   setActiveInfoModal(null);
                 }}
-                className="inline-flex items-center gap-1.5 sm:gap-2 font-editorial text-xl sm:text-xl md:text-2xl lg:text-3xl font-semibold tracking-tight text-white drop-shadow-sm whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1 font-editorial text-lg min-[400px]:text-xl font-semibold tracking-tight text-white drop-shadow-sm whitespace-nowrap shrink-0"
               >
-                <Flower2 className="w-4 h-4 sm:w-4.5 sm:h-4.5 lg:w-5 lg:h-5 text-pink-100 shrink-0" />
+                <Flower2 className="w-4 h-4 text-pink-100 shrink-0" />
                 <span>Unsaid</span>
               </a>
 
-              {/* Mobile-only Plant CTA on Row 1 right */}
+              <nav
+                aria-label="Primary mobile navigation"
+                className="flex items-center justify-end gap-2 min-[400px]:gap-2.5 text-[11px] min-[400px]:text-xs font-medium text-white/95 min-w-0"
+              >
+                <button
+                  type="button"
+                  onClick={() => setActiveInfoModal('about')}
+                  className="py-1 hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
+                >
+                  About
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveInfoModal('how-it-works')}
+                  className="py-1 hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
+                >
+                  How It Works
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openPrivacyTrustModal('overview')}
+                  className="py-1 hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
+                  title="Inspect Unsaid Privacy & Data Ownership"
+                >
+                  Privacy
+                </button>
+
+                {/* Gmail / Account Button */}
+                {currentUser ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsAccountModalOpen(true)}
+                    className="inline-flex items-center gap-1 pl-0.5 pr-2 py-0.5 rounded-full bg-white/25 hover:bg-white/35 border border-white/40 text-[11px] font-medium text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
+                    title="View account and subscription plan"
+                  >
+                    {currentUser.photoURL ? (
+                      <img
+                        src={currentUser.photoURL}
+                        alt={firstName}
+                        referrerPolicy="no-referrer"
+                        className="w-5 h-5 rounded-full object-cover border border-white/70 shrink-0"
+                      />
+                    ) : (
+                      <span className="w-5 h-5 rounded-full bg-slate-900/80 text-[10px] font-semibold flex items-center justify-center shrink-0">
+                        {firstName.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="max-w-[54px] truncate">{firstName}</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsAccountModalOpen(true)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/22 hover:bg-white/35 border border-white/40 text-[11px] font-medium text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
+                  >
+                    <LogIn className="w-3 h-3 shrink-0" />
+                    <span>Sign In</span>
+                  </button>
+                )}
+              </nav>
+            </div>
+
+            {/* Row 2 directly below: My Space, My Inner Garden & Plant a Seed CTA */}
+            <div className="flex flex-wrap items-center justify-end gap-1.5 min-[400px]:gap-2">
               <button
                 type="button"
-                onClick={() => setIsWriteModalOpen(true)}
-                className="sm:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md border border-white/25 text-xs font-medium text-white shadow-sm transition-all whitespace-nowrap cursor-pointer shrink-0"
+                onClick={() => setIsInnerGardenOpen(true)}
+                className="inline-flex items-center gap-1 py-1.5 px-2.5 rounded-full bg-emerald-100/22 hover:bg-emerald-100/35 border border-emerald-100/45 text-[11px] min-[400px]:text-xs font-medium text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
+                title="Open your private My Inner Garden"
+              >
+                <Sprout className="w-3.5 h-3.5 text-emerald-100 shrink-0" />
+                <span>My Inner Garden</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsMySpaceOpen(true)}
+                className="inline-flex items-center gap-1 py-1.5 px-2.5 rounded-full bg-rose-100/22 hover:bg-rose-100/35 border border-rose-100/45 text-[11px] min-[400px]:text-xs font-medium text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
+                title="Open your private My Space"
+              >
+                <BookHeart className="w-3.5 h-3.5 text-rose-100 shrink-0" />
+                <span>My Space</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleOpenGeneralPlanting}
+                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md border border-white/25 text-[11px] min-[400px]:text-xs font-medium text-white shadow-sm transition-all whitespace-nowrap cursor-pointer shrink-0"
               >
                 <span>Plant a Seed 🌱</span>
               </button>
-            </div>
 
-            {/* Row 2 on mobile / Right side on Tablet & Laptop: Navigation, Sound, Auth & Tablet/Desktop CTA */}
-            <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-2.5 md:gap-4 lg:gap-5 shrink-0">
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setIsAdminModalOpen(true)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-amber-400/90 hover:bg-amber-300 text-slate-950 border border-amber-200 text-[11px] font-semibold transition-colors whitespace-nowrap cursor-pointer shadow-xs shrink-0"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                  <span>Backend</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Tablet & Desktop Header (sm and up): Clean single-row navigation without audio control */}
+          <div className="hidden sm:flex max-w-7xl mx-auto items-center justify-between gap-3 md:gap-4">
+            <a
+              href="#top"
+              onClick={(e) => {
+                e.preventDefault();
+                setActiveStory(null);
+                setIsWriteModalOpen(false);
+                setActiveInfoModal(null);
+              }}
+              className="inline-flex items-center gap-2 font-editorial text-xl md:text-2xl lg:text-3xl font-semibold tracking-tight text-white drop-shadow-sm whitespace-nowrap shrink-0"
+            >
+              <Flower2 className="w-4.5 h-4.5 lg:w-5 lg:h-5 text-pink-100 shrink-0" />
+              <span>Unsaid</span>
+            </a>
+
+            <div className="flex items-center justify-end gap-2.5 md:gap-4 lg:gap-5 shrink-0">
               <nav
                 aria-label="Primary navigation"
-                className="flex flex-wrap sm:flex-nowrap items-center justify-between sm:justify-end w-full sm:w-auto gap-1.5 min-[400px]:gap-2 sm:gap-2.5 md:gap-4 lg:gap-5 text-xs md:text-sm font-medium text-white/95"
+                className="flex items-center justify-end gap-2.5 md:gap-4 lg:gap-5 text-xs md:text-sm font-medium text-white/95"
               >
                 <button
                   type="button"
@@ -489,21 +514,15 @@ export default function App() {
                   type="button"
                   onClick={() => openPrivacyTrustModal('overview')}
                   className="inline-flex items-center gap-1 py-1 hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
-                  title="Inspect Unsaid Privacy, Zero-Knowledge Vault & Data Ownership"
+                  title="Inspect Unsaid Privacy & Data Ownership"
                 >
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-100 shrink-0" />
                   <span>Privacy</span>
-                  {vaultUnlocked && (
-                    <span
-                      className="w-1.5 h-1.5 rounded-full bg-emerald-300 shrink-0"
-                      aria-label="Zero-Knowledge Vault unlocked"
-                    />
-                  )}
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsInnerGardenOpen(true)}
-                  className="inline-flex items-center gap-1.5 py-1 px-2 sm:px-2.5 rounded-full bg-emerald-100/22 hover:bg-emerald-100/35 border border-emerald-100/45 text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
+                  className="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full bg-emerald-100/22 hover:bg-emerald-100/35 border border-emerald-100/45 text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
                   title="Open your private My Inner Garden"
                 >
                   <Sprout className="w-3.5 h-3.5 text-emerald-100 shrink-0" />
@@ -512,37 +531,11 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setIsMySpaceOpen(true)}
-                  className="inline-flex items-center gap-1.5 py-1 px-2 sm:px-2.5 rounded-full bg-rose-100/20 hover:bg-rose-100/35 border border-rose-100/40 text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
+                  className="inline-flex items-center gap-1.5 py-1 px-2.5 rounded-full bg-rose-100/20 hover:bg-rose-100/35 border border-rose-100/40 text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
                   title="Open your private My Space"
                 >
                   <BookHeart className="w-3.5 h-3.5 text-rose-100 shrink-0" />
                   <span>My Space</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleToggleSound}
-                  aria-label={
-                    isSoundEnabled
-                      ? 'Mute meadow soundscape'
-                      : 'Enable meadow soundscape'
-                  }
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 hover:bg-white/30 border border-white/35 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs"
-                >
-                  {isSoundEnabled ? (
-                    <>
-                      <Volume2 className="w-3.5 h-3.5 shrink-0" />
-                      <span className="hidden min-[400px]:inline sm:hidden lg:inline text-xs">
-                        Sound On
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <VolumeX className="w-3.5 h-3.5 opacity-90 shrink-0" />
-                      <span className="hidden min-[400px]:inline sm:hidden lg:inline text-xs">
-                        Sound Off
-                      </span>
-                    </>
-                  )}
                 </button>
 
                 {/* Sign In / Account Button */}
@@ -594,8 +587,8 @@ export default function App() {
               {/* Tablet & Desktop Plant CTA */}
               <button
                 type="button"
-                onClick={() => setIsWriteModalOpen(true)}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md border border-white/25 text-xs md:text-sm font-medium text-white shadow-sm transition-all whitespace-nowrap cursor-pointer shrink-0"
+                onClick={handleOpenGeneralPlanting}
+                className="inline-flex items-center gap-1.5 px-3 md:px-4 py-1.5 md:py-2 rounded-full bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md border border-white/25 text-xs md:text-sm font-medium text-white shadow-sm transition-all whitespace-nowrap cursor-pointer shrink-0"
               >
                 <span>Plant a Seed 🌱</span>
               </button>
@@ -631,12 +624,25 @@ export default function App() {
                 type="button"
                 onClick={() => {
                   soundscape.playBloomChord();
-                  handleReadRandomStory();
+                  if (stories.length > 0) {
+                    handleReadRandomStory();
+                  } else {
+                    handleOpenGeneralPlanting();
+                  }
                 }}
                 className="inline-flex items-center justify-center gap-1.5 px-3.5 sm:px-4 md:px-5 py-1.5 sm:py-2 rounded-full bg-white/25 hover:bg-white/38 backdrop-blur-md border border-white/45 text-xs sm:text-sm font-medium text-white shadow-xs transition-all cursor-pointer"
               >
-                <Compass className="w-3.5 h-3.5 text-white shrink-0" />
-                <span>Tap on a flower to discover someone's story.</span>
+                {stories.length > 0 ? (
+                  <>
+                    <Compass className="w-3.5 h-3.5 text-white shrink-0" />
+                    <span>Tap a glowing flower to read a story, or pick any bloom to plant yours.</span>
+                  </>
+                ) : (
+                  <>
+                    <Sprout className="w-3.5 h-3.5 text-emerald-100 shrink-0" />
+                    <span>Tap any flower below to plant the first story in this meadow.</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -668,7 +674,11 @@ export default function App() {
         selectedSeed={selectedSeed}
         onSelectSeed={setSelectedSeed}
         existingStories={stories}
-        onClose={() => setIsWriteModalOpen(false)}
+        targetFlower={targetAmbientFlower}
+        onClose={() => {
+          setIsWriteModalOpen(false);
+          setTargetAmbientFlower(null);
+        }}
         onStoryPlanted={handleStoryPlanted}
       />
 
@@ -676,8 +686,9 @@ export default function App() {
       <InfoModals
         activeModal={activeInfoModal}
         onClose={() => setActiveInfoModal(null)}
-        onStartPlanting={() => setIsWriteModalOpen(true)}
-        totalFlowersCount={stories.length}
+        onStartPlanting={handleOpenGeneralPlanting}
+        totalFlowersCount={Math.max(AMBIENT_MEADOW_FLOWERS.length, stories.length)}
+        plantedStoriesCount={stories.length}
       />
 
       {/* 7. Google Sign-In & Member Account Modal */}
@@ -708,7 +719,6 @@ export default function App() {
         voiceJournals={voiceJournals}
         memories={memories}
         gardenCustomisation={activeGardenCustomisation}
-        lockedEncryptedCount={lockedDiaryCount}
         onOpenPrivacyTrust={openPrivacyTrustModal}
         onUpdateCustomisation={handleUpdateCustomisation}
         onOpenUpgrade={handleOpenUpgrade}
@@ -734,23 +744,18 @@ export default function App() {
         entries={innerEntries}
         reflections={innerReflections}
         prefs={innerPrivacyPrefs}
-        lockedEncryptedCount={lockedInnerCount}
         onOpenPrivacyTrust={openPrivacyTrustModal}
         onClose={() => setIsInnerGardenOpen(false)}
       />
 
-      {/* 12. Privacy & Trust Verification Shield + Zero-Knowledge Vault + Export/Wipe */}
+      {/* 12. Privacy & Trust Verification Shield + Export/Wipe */}
       <PrivacyTrustModal
         isOpen={isPrivacyModalOpen}
         initialTab={privacyModalTab}
         currentUser={currentUser}
-        vaultUnlocked={vaultUnlocked}
-        rawDiaryEntries={rawDiaryEntries}
-        rawInnerEntries={rawInnerEntries}
-        rawInnerReflections={rawInnerReflections}
-        decryptedDiaryEntries={diaryEntries}
-        decryptedInnerEntries={innerEntries}
-        decryptedInnerReflections={innerReflections}
+        diaryEntries={diaryEntries}
+        innerEntries={innerEntries}
+        innerReflections={innerReflections}
         voiceJournals={voiceJournals}
         memories={memories}
         innerPrivacyPrefs={innerPrivacyPrefs}

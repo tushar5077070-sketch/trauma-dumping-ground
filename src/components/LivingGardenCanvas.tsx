@@ -1,11 +1,15 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Sparkles, Heart } from 'lucide-react';
+import { Flower2, Heart, Sprout } from 'lucide-react';
 import {
+  AMBIENT_MEADOW_FLOWERS,
+  AmbientMeadowFlower,
   DEFAULT_GARDEN_CUSTOMISATION,
   EXCLUSIVE_FLORA_CATALOG,
+  FlowerVariant,
   GARDEN_BACKGROUND_CATALOG,
   GardenCustomisationSettings,
   SEED_OPTIONS,
+  SeedType,
   Story,
 } from '../types/garden';
 import { soundscape } from '../utils/soundscape';
@@ -15,8 +19,22 @@ import cleanMeadowSkyImg from '../assets/images/clean_meadow_sky_1794588674441.j
 interface LivingGardenCanvasProps {
   stories: Story[];
   onSelectStory: (story: Story) => void;
+  onSelectEmptyFlower: (flower: AmbientMeadowFlower) => void;
   highlightedStoryId?: string | null;
   gardenCustomisation?: GardenCustomisationSettings;
+}
+
+interface MeadowBloomItem {
+  id: string;
+  kind: 'story' | 'empty';
+  seedType: SeedType;
+  flowerVariant: FlowerVariant;
+  positionX: number;
+  positionY: number;
+  scale: number;
+  isNewlyPlanted?: boolean;
+  story?: Story;
+  ambientFlower?: AmbientMeadowFlower;
 }
 
 interface GrassBlade {
@@ -92,6 +110,7 @@ function getFlowerBottomPx(
 export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
   stories,
   onSelectStory,
+  onSelectEmptyFlower,
   highlightedStoryId,
   gardenCustomisation = DEFAULT_GARDEN_CUSTOMISATION,
 }) => {
@@ -104,7 +123,7 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
 
   const flowerVisualRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const [hoveredStoryId, setHoveredStoryId] = useState<string | null>(null);
+  const [hoveredBloomId, setHoveredBloomId] = useState<string | null>(null);
   const [viewportSize, setViewportSize] = useState<{
     width: number;
     height: number;
@@ -113,7 +132,7 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
     height: typeof window !== 'undefined' ? window.innerHeight : 800,
   }));
 
-  const hoveredStoryIdRef = useRef<string | null>(null);
+  const hoveredBloomIdRef = useRef<string | null>(null);
   const highlightedStoryIdRef = useRef<string | null>(
     highlightedStoryId || null
   );
@@ -122,8 +141,8 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
   );
 
   useEffect(() => {
-    hoveredStoryIdRef.current = hoveredStoryId;
-  }, [hoveredStoryId]);
+    hoveredBloomIdRef.current = hoveredBloomId;
+  }, [hoveredBloomId]);
 
   useEffect(() => {
     highlightedStoryIdRef.current = highlightedStoryId || null;
@@ -178,27 +197,62 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
     return Math.min(wFactor, hFactor);
   }, [viewportSize.width, viewportSize.height]);
 
+  // Unified list of living flowers: real planted stories + unoccupied ambient wildflowers
+  const meadowBlooms = useMemo<MeadowBloomItem[]>(() => {
+    const storyItems: MeadowBloomItem[] = stories.map((story) => ({
+      id: story.storyId,
+      kind: 'story',
+      seedType: story.seedType,
+      flowerVariant: story.flowerVariant,
+      positionX: story.positionX,
+      positionY: story.positionY,
+      scale: story.scale,
+      isNewlyPlanted: story.isNewlyPlanted,
+      story,
+    }));
+
+    const ambientItems: MeadowBloomItem[] = AMBIENT_MEADOW_FLOWERS.filter(
+      (slot) =>
+        stories.every((s) => {
+          const dx = s.positionX - slot.positionX;
+          const dy = s.positionY - slot.positionY;
+          return Math.sqrt(dx * dx + dy * dy) > 3.5;
+        })
+    ).map((slot) => ({
+      id: slot.flowerId,
+      kind: 'empty',
+      seedType: slot.seedType,
+      flowerVariant: slot.flowerVariant,
+      positionX: slot.positionX,
+      positionY: slot.positionY,
+      scale: slot.scale,
+      ambientFlower: slot,
+    }));
+
+    return [...storyItems, ...ambientItems];
+  }, [stories]);
+
   useEffect(() => {
     const current = springStateRef.current;
-    stories.forEach((story, idx) => {
+    meadowBlooms.forEach((bloom, idx) => {
       const natScale = Number(
-        (story.scale * deviceScaleMultiplier).toFixed(3)
+        (bloom.scale * deviceScaleMultiplier).toFixed(3)
       );
-      if (!current[story.storyId]) {
-        current[story.storyId] = {
+      if (!current[bloom.id]) {
+        current[bloom.id] = {
           angle: 0,
           velocity: 0,
-          scale: story.isNewlyPlanted ? natScale * 0.18 : natScale,
-          scaleVelocity: story.isNewlyPlanted ? 0.04 : 0,
+          scale: bloom.isNewlyPlanted ? natScale * 0.18 : natScale,
+          scaleVelocity: bloom.isNewlyPlanted ? 0.04 : 0,
           phase: idx * 1.17,
           speed: 1.05 + (idx % 5) * 0.14,
           naturalScale: natScale,
         };
       } else {
-        current[story.storyId].naturalScale = natScale;
+        current[bloom.id].naturalScale = natScale;
       }
     });
-  }, [stories, deviceScaleMultiplier]);
+  }, [meadowBlooms, deviceScaleMultiplier]);
 
   useEffect(() => {
     const bgCanvas = bgCanvasRef.current;
@@ -855,21 +909,21 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         fgCtx.restore();
       }
 
-      // 8. 60fps Direct GPU Transform Solver for Story Flowers
-      const activeHoverId = hoveredStoryIdRef.current;
+      // 8. 60fps Direct GPU Transform Solver for All Meadow Flowers (Planted + Ambient)
+      const activeHoverId = hoveredBloomIdRef.current;
       const activeHighlightId = highlightedStoryIdRef.current;
 
-      for (let i = 0; i < stories.length; i++) {
-        const s = stories[i];
-        const st = springStateRef.current[s.storyId];
+      for (let i = 0; i < meadowBlooms.length; i++) {
+        const b = meadowBlooms[i];
+        const st = springStateRef.current[b.id];
         if (!st) continue;
 
-        const isHovered = activeHoverId === s.storyId;
-        const isHighlighted = activeHighlightId === s.storyId;
+        const isHovered = activeHoverId === b.id;
+        const isHighlighted = activeHighlightId === b.id;
 
-        const safePosX = getSafePosX(s.positionX);
+        const safePosX = getSafePosX(b.positionX);
         const flowerBottomPx = getFlowerBottomPx(
-          s.positionY,
+          b.positionY,
           st.naturalScale,
           height
         );
@@ -878,7 +932,7 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
 
         const wind = prefersReducedMotion
           ? 0
-          : Math.sin(t * st.speed + (s.positionX / 100) * 5.2 + st.phase) *
+          : Math.sin(t * st.speed + (b.positionX / 100) * 5.2 + st.phase) *
               5.2 +
             Math.cos(t * 0.7 + st.phase) * 2.4 +
             1.5;
@@ -908,7 +962,7 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         st.scaleVelocity = (st.scaleVelocity + scaleAccel) * 0.76;
         st.scale += st.scaleVelocity;
 
-        const visualEl = flowerVisualRefs.current[s.storyId];
+        const visualEl = flowerVisualRefs.current[b.id];
         if (visualEl) {
           visualEl.style.transform = `scale(${st.scale.toFixed(
             3
@@ -917,8 +971,8 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
 
         if (
           popupCardRef.current &&
-          (s.storyId === activeHoverId ||
-            (!activeHoverId && s.storyId === activeHighlightId))
+          (b.id === activeHoverId ||
+            (!activeHoverId && b.id === activeHighlightId))
         ) {
           const bendOffsetPx = st.angle * 1.1;
           const minX = width < 640 ? 24 : width <= 1024 ? 16 : 12;
@@ -942,7 +996,7 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener('resize', updateCanvasSize);
     };
-  }, [stories]);
+  }, [meadowBlooms]);
 
   const handlePointerMove = (clientX: number, clientY: number) => {
     pointerRef.current.x = clientX;
@@ -955,25 +1009,30 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
   };
 
   const handleMeadowBackgroundClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (
-      e.clientY > window.innerHeight * (1 - MEADOW_HEIGHT_RATIO) &&
-      stories.length > 0
-    ) {
+    if (e.clientY > window.innerHeight * (1 - MEADOW_HEIGHT_RATIO)) {
       soundscape.playBloomChord();
-      const randomStory = stories[Math.floor(Math.random() * stories.length)];
-      onSelectStory(randomStory);
+      if (stories.length > 0) {
+        const randomStory = stories[Math.floor(Math.random() * stories.length)];
+        onSelectStory(randomStory);
+      } else {
+        const randomFlower =
+          AMBIENT_MEADOW_FLOWERS[
+            Math.floor(Math.random() * AMBIENT_MEADOW_FLOWERS.length)
+          ];
+        onSelectEmptyFlower(randomFlower);
+      }
     }
   };
 
-  const sortedStories = useMemo(() => {
-    return [...stories].sort((a, b) => b.positionY - a.positionY);
-  }, [stories]);
+  const sortedBlooms = useMemo(() => {
+    return [...meadowBlooms].sort((a, b) => b.positionY - a.positionY);
+  }, [meadowBlooms]);
 
-  const activePopupStory = useMemo(() => {
-    const targetId = hoveredStoryId || highlightedStoryId;
+  const activePopupBloom = useMemo(() => {
+    const targetId = hoveredBloomId || highlightedStoryId;
     if (!targetId) return null;
-    return stories.find((s) => s.storyId === targetId) || null;
-  }, [hoveredStoryId, highlightedStoryId, stories]);
+    return meadowBlooms.find((b) => b.id === targetId) || null;
+  }, [hoveredBloomId, highlightedStoryId, meadowBlooms]);
 
   return (
     <div
@@ -996,35 +1055,36 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         style={{ zIndex: 10 }}
       />
 
-      {/* LAYER 2: Interactive Story Flowers Anchored Strictly Inside the 42% Meadow */}
+      {/* LAYER 2: Interactive Meadow Flowers (Empty Ambient Blooms + Real Planted Stories) */}
       <div
         ref={flowersLayerRef}
         className="absolute inset-x-0 bottom-0 h-[42%] pointer-events-none will-change-transform"
         style={{ zIndex: 25 }}
       >
-        {sortedStories.map((story) => {
-          const isHovered = hoveredStoryId === story.storyId;
-          const isHighlighted = highlightedStoryId === story.storyId;
+        {sortedBlooms.map((bloom) => {
+          const isHovered = hoveredBloomId === bloom.id;
+          const isHighlighted = highlightedStoryId === bloom.id;
+          const isPlantedStory = bloom.kind === 'story';
           const depthZ = isHovered
             ? 450
             : isHighlighted
             ? 400
-            : Math.round(120 - story.positionY);
+            : Math.round(120 - bloom.positionY);
 
-          const isFarHorizon = story.positionY > 56;
+          const isFarHorizon = bloom.positionY > 56;
           const initialScale = Number(
-            (story.scale * deviceScaleMultiplier).toFixed(3)
+            (bloom.scale * deviceScaleMultiplier).toFixed(3)
           );
-          const safePosX = getSafePosX(story.positionX);
+          const safePosX = getSafePosX(bloom.positionX);
           const flowerBottomPx = getFlowerBottomPx(
-            story.positionY,
+            bloom.positionY,
             initialScale,
             viewportSize.height
           );
 
           return (
             <div
-              key={story.storyId}
+              key={bloom.id}
               onClick={(e) => e.stopPropagation()}
               className="pointer-events-auto absolute origin-bottom -translate-x-1/2"
               style={{
@@ -1036,8 +1096,12 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
                   : 'brightness(1.01) saturate(0.96)',
               }}
             >
-              {(isHighlighted || story.isNewlyPlanted) && (
+              {(isHighlighted || bloom.isNewlyPlanted) && (
                 <div className="pointer-events-none absolute -inset-4 rounded-full bg-amber-200/55 blur-xl animate-pulse-aura" />
+              )}
+
+              {isPlantedStory && !isHighlighted && !bloom.isNewlyPlanted && (
+                <div className="pointer-events-none absolute -inset-2.5 rounded-full bg-amber-100/40 blur-lg" />
               )}
 
               {gardenCustomisation.exclusiveFloraPreset !== 'classic' && (
@@ -1055,30 +1119,34 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
               <button
                 type="button"
                 onMouseEnter={() => {
-                  setHoveredStoryId(story.storyId);
+                  setHoveredBloomId(bloom.id);
                   soundscape.playHoverChime();
                 }}
                 onMouseLeave={() =>
-                  setHoveredStoryId((prev) =>
-                    prev === story.storyId ? null : prev
-                  )
+                  setHoveredBloomId((prev) => (prev === bloom.id ? null : prev))
                 }
-                onFocus={() => setHoveredStoryId(story.storyId)}
+                onFocus={() => setHoveredBloomId(bloom.id)}
                 onBlur={() =>
-                  setHoveredStoryId((prev) =>
-                    prev === story.storyId ? null : prev
-                  )
+                  setHoveredBloomId((prev) => (prev === bloom.id ? null : prev))
                 }
                 onClick={() => {
                   soundscape.playBloomChord();
-                  onSelectStory(story);
+                  if (bloom.kind === 'story' && bloom.story) {
+                    onSelectStory(bloom.story);
+                  } else if (bloom.ambientFlower) {
+                    onSelectEmptyFlower(bloom.ambientFlower);
+                  }
                 }}
-                aria-label={`Read story by ${story.anonymousId}`}
+                aria-label={
+                  bloom.kind === 'story' && bloom.story
+                    ? 'Read an anonymous story'
+                    : `Open ${bloom.seedType} bloom — tap to plant your story here`
+                }
                 className="group relative flex items-end justify-center w-[64px] h-[132px] cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white/90 rounded-full"
               >
                 <div
                   ref={(el) => {
-                    flowerVisualRefs.current[story.storyId] = el;
+                    flowerVisualRefs.current[bloom.id] = el;
                   }}
                   className="w-[78px] h-[150px] pointer-events-none will-change-transform"
                   style={{
@@ -1087,11 +1155,11 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
                   }}
                 >
                   <MeadowFlowerSvg
-                    variant={story.flowerVariant}
+                    variant={bloom.flowerVariant}
                     isHovered={isHovered || isHighlighted}
                     bendAngle={0}
                     stemHeight={122}
-                    uniqueId={story.storyId}
+                    uniqueId={bloom.id}
                   />
                 </div>
               </button>
@@ -1107,8 +1175,8 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         style={{ zIndex: 35 }}
       />
 
-      {/* LAYER 4: Top-Level Unobstructed Floating "Read this story" Whisper Card */}
-      {activePopupStory && (
+      {/* LAYER 4: Top-Level Unobstructed Floating Whisper Card */}
+      {activePopupBloom && (
         <div
           ref={popupLayerRef}
           className="pointer-events-none absolute inset-x-0 bottom-0 h-[42%] will-change-transform"
@@ -1116,17 +1184,16 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
         >
           {(() => {
             const seedInfo =
-              SEED_OPTIONS.find((s) => s.id === activePopupStory.seedType) ||
+              SEED_OPTIONS.find((s) => s.id === activePopupBloom.seedType) ||
               SEED_OPTIONS[0];
-            const naturalScale =
-              activePopupStory.scale * deviceScaleMultiplier;
+            const naturalScale = activePopupBloom.scale * deviceScaleMultiplier;
             const flowerTopOffsetPx = Math.round(135 * naturalScale);
             const flowerBottomPx = getFlowerBottomPx(
-              activePopupStory.positionY,
+              activePopupBloom.positionY,
               naturalScale,
               viewportSize.height
             );
-            const safePosX = getSafePosX(activePopupStory.positionX);
+            const safePosX = getSafePosX(activePopupBloom.positionX);
             const minX =
               viewportSize.width < 640
                 ? 24
@@ -1141,8 +1208,8 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
                 : 88;
             const clampedX = Math.max(minX, Math.min(maxX, safePosX));
             const isHighlighted =
-              highlightedStoryId === activePopupStory.storyId &&
-              hoveredStoryId !== activePopupStory.storyId;
+              highlightedStoryId === activePopupBloom.id &&
+              hoveredBloomId !== activePopupBloom.id;
 
             return (
               <div
@@ -1153,28 +1220,51 @@ export const LivingGardenCanvas: React.FC<LivingGardenCanvasProps> = ({
                 }}
                 className="absolute -translate-x-1/2 will-change-[left,bottom]"
               >
-                <div className="relative px-3.5 py-2 rounded-2xl bg-white/95 backdrop-blur-xl shadow-[0_10px_28px_rgba(15,23,42,0.18)] border border-white min-w-[164px] max-w-[215px] text-center">
-                  <div className="inline-flex items-center justify-center gap-1 text-[11px] font-semibold text-slate-900">
-                    <Sparkles className="w-3 h-3 text-amber-500 shrink-0" />
-                    <span>
-                      {isHighlighted
-                        ? 'Your newly planted flower'
-                        : 'Read this story'}
-                    </span>
-                  </div>
+                <div className="relative px-3.5 py-2 rounded-2xl bg-white/95 backdrop-blur-xl shadow-[0_10px_28px_rgba(15,23,42,0.18)] border border-white min-w-[168px] max-w-[225px] text-center">
+                  {activePopupBloom.kind === 'story' && activePopupBloom.story ? (
+                    <>
+                      <div className="inline-flex items-center justify-center gap-1 text-[11px] font-semibold text-slate-900">
+                        <Flower2 className="w-3 h-3 text-rose-500 shrink-0" />
+                        <span>
+                          {isHighlighted
+                            ? 'Your newly planted flower'
+                            : 'Read this story'}
+                        </span>
+                      </div>
 
-                  <p className="text-[11px] font-medium text-slate-600 mt-0.5 truncate">
-                    {activePopupStory.anonymousId}
-                  </p>
+                      <p className="text-[11px] font-medium text-slate-600 mt-0.5 truncate">
+                        Anonymous Soul
+                      </p>
 
-                  <div className="mt-0.5 flex items-center justify-center gap-1.5 text-[10px] text-slate-500">
-                    <span>{seedInfo.name}</span>
-                    <span aria-hidden="true">·</span>
-                    <span className="inline-flex items-center gap-0.5 text-rose-600 font-medium">
-                      <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500" />
-                      {activePopupStory.warmthCount}
-                    </span>
-                  </div>
+                      <div className="mt-0.5 flex items-center justify-center gap-1.5 text-[10px] text-slate-500">
+                        <span>{seedInfo.name}</span>
+                        <span aria-hidden="true">·</span>
+                        <span className="inline-flex items-center gap-0.5 text-rose-600 font-medium">
+                          <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500" />
+                          {activePopupBloom.story.warmthCount}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="inline-flex items-center justify-center gap-1 text-[11px] font-semibold text-slate-900">
+                        <Sprout className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <span>Open meadow bloom</span>
+                      </div>
+
+                      <p className="text-[11px] font-medium text-slate-600 mt-0.5">
+                        Tap to plant your story here
+                      </p>
+
+                      <div className="mt-0.5 flex items-center justify-center gap-1.5 text-[10px] text-slate-500">
+                        <span>{seedInfo.name}</span>
+                        <span aria-hidden="true">·</span>
+                        <span className="text-emerald-700 font-medium">
+                          Waiting for a voice
+                        </span>
+                      </div>
+                    </>
+                  )}
 
                   <div className="w-2.5 h-2.5 bg-white/95 border-r border-b border-white rotate-45 mx-auto -mb-2.5 mt-1 shadow-2xs" />
                 </div>

@@ -12,9 +12,9 @@ import {
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
 import {
+  AMBIENT_MEADOW_FLOWERS,
+  AmbientMeadowFlower,
   FlowerVariant,
-  INITIAL_GARDEN_STORIES,
-  INITIAL_SUPPORTIVE_MESSAGES,
   ReactionType,
   SeedType,
   Story,
@@ -27,57 +27,10 @@ import {
 } from '../utils/contentModeration';
 
 const LOCAL_FALLBACK_KEY = 'tdg_local_stories_v1';
-const LOCAL_MESSAGES_KEY = 'tdg_local_messages_v1';
 const LAST_PLANT_TIMESTAMP_KEY = 'tdg_last_plant_ts';
 
-let isSeedingInProgress = false;
-
-// Per-page-load shuffle offset & permutation so every browser refresh assigns fresh stories to each flower in the meadow
-const SESSION_SHUFFLE_ORDER: number[] = (() => {
-  const indices = INITIAL_GARDEN_STORIES.map((_, i) => i);
-  for (let i = indices.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const tmp = indices[i];
-    indices[i] = indices[j];
-    indices[j] = tmp;
-  }
-  return indices;
-})();
-
-const SESSION_STORY_SLOT_MAP = new Map<
-  string,
-  {
-    positionX: number;
-    positionY: number;
-    scale: number;
-    flowerVariant: FlowerVariant;
-  }
->();
-
-INITIAL_GARDEN_STORIES.forEach((story, idx) => {
-  const targetSlot = INITIAL_GARDEN_STORIES[SESSION_SHUFFLE_ORDER[idx]];
-  SESSION_STORY_SLOT_MAP.set(story.storyId, {
-    positionX: targetSlot.positionX,
-    positionY: targetSlot.positionY,
-    scale: targetSlot.scale,
-    flowerVariant: story.flowerVariant,
-  });
-});
-
-export function getInitialShuffledStories(): Story[] {
-  return SESSION_SHUFFLE_ORDER.map((shuffledIdx, idx) => {
-    const s = INITIAL_GARDEN_STORIES[shuffledIdx];
-    const slot = SESSION_STORY_SLOT_MAP.get(s.storyId);
-    return {
-      ...s,
-      positionX: slot ? slot.positionX : s.positionX,
-      positionY: slot ? slot.positionY : s.positionY,
-      scale: slot ? slot.scale : s.scale,
-      createdAt: new Date(Date.now() - (idx + 1) * 3600 * 1000 * 4),
-      updatedAt: new Date(Date.now() - (idx + 1) * 3600 * 1000 * 4),
-    };
-  });
-}
+// Launch-era prefix so pre-launch seeded/test documents are never displayed in the fresh launch meadow
+export const LAUNCH_STORY_ID_PREFIX = 'bloom_';
 
 function toDate(val: unknown): Date {
   if (val instanceof Timestamp) {
@@ -116,56 +69,24 @@ export function pickFlowerVariantForSeed(seedType: SeedType): FlowerVariant {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-export async function ensureInitialStoriesSeeded(): Promise<void> {
-  if (isSeedingInProgress) return;
-  isSeedingInProgress = true;
-  const path = 'stories';
-  try {
-    const q = query(collection(db, path), where('moderationStatus', '==', 'approved'));
-    const snap = await getDocs(q);
-    const existingIds = new Set(snap.docs.map((d) => d.id));
-    const missingStories = INITIAL_GARDEN_STORIES.filter(
-      (item) => !existingIds.has(item.storyId)
-    );
-
-    if (missingStories.length === 0) {
-      return;
-    }
-
-    const batch = writeBatch(db);
-    for (const item of missingStories) {
-      const storyRef = doc(db, 'stories', item.storyId);
-      batch.set(storyRef, {
-        storyId: item.storyId,
-        anonymousId: item.anonymousId,
-        content: item.content,
-        seedType: item.seedType,
-        flowerVariant: item.flowerVariant,
-        contentWarning: item.contentWarning,
-        moderationStatus: 'approved',
-        warmthCount: item.warmthCount,
-        messageCount: item.messageCount,
-        positionX: item.positionX,
-        positionY: item.positionY,
-        scale: item.scale,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    }
-    await batch.commit();
-  } catch (error) {
-    console.warn('Initial seeding skipped or handled locally:', error);
-  } finally {
-    isSeedingInProgress = false;
-  }
-}
-
+/**
+ * Subscribes strictly to real post-launch community stories planted in Firestore.
+ * Pre-seeded demo stories and pre-launch test records are never seeded or displayed.
+ */
 export function subscribeToApprovedStories(
   onUpdate: (stories: Story[], isCloudConnected: boolean) => void
 ): () => void {
-  ensureInitialStoriesSeeded();
+  // Clear any legacy local pre-launch demo stories cache
+  try {
+    localStorage.removeItem(LOCAL_FALLBACK_KEY);
+  } catch {
+    // Ignore storage errors
+  }
 
-  const q = query(collection(db, 'stories'), where('moderationStatus', '==', 'approved'));
+  const q = query(
+    collection(db, 'stories'),
+    where('moderationStatus', '==', 'approved')
+  );
   const unsubscribe = onSnapshot(
     q,
     (snapshot) => {
@@ -173,11 +94,17 @@ export function subscribeToApprovedStories(
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
         const storyId = String(data.storyId || docSnap.id);
+
+        // Only surface real stories planted after the fresh market launch reset
+        if (!storyId.startsWith(LAUNCH_STORY_ID_PREFIX)) {
+          return;
+        }
+
         const content = String(data.content || '');
         if (!checkPlantedStoryLocal(content).allowed) {
           return;
         }
-        const shuffledSlot = SESSION_STORY_SLOT_MAP.get(storyId);
+
         loaded.push({
           storyId,
           anonymousId: String(data.anonymousId || 'Anonymous Soul #1048'),
@@ -189,42 +116,22 @@ export function subscribeToApprovedStories(
           moderationStatus: 'approved',
           warmthCount: Number(data.warmthCount ?? 0),
           messageCount: Number(data.messageCount ?? 0),
-          positionX: shuffledSlot
-            ? shuffledSlot.positionX
-            : Number(data.positionX ?? 50),
-          positionY: shuffledSlot
-            ? shuffledSlot.positionY
-            : Number(data.positionY ?? 50),
-          scale: shuffledSlot ? shuffledSlot.scale : Number(data.scale ?? 1),
+          positionX: Number(data.positionX ?? 50),
+          positionY: Number(data.positionY ?? 50),
+          scale: Number(data.scale ?? 1),
           createdAt: toDate(data.createdAt),
           updatedAt: toDate(data.updatedAt),
         });
       });
 
-      if (loaded.length > 0) {
-        // Order user-planted stories first, followed by the per-refresh shuffled seed order
-        const orderRank = new Map<string, number>();
-        SESSION_SHUFFLE_ORDER.forEach((storyIdx, rank) => {
-          orderRank.set(INITIAL_GARDEN_STORIES[storyIdx].storyId, rank + 1000);
-        });
-        loaded.sort((a, b) => {
-          const rankA = orderRank.get(a.storyId) ?? 0;
-          const rankB = orderRank.get(b.storyId) ?? 0;
-          if (rankA !== rankB) return rankA - rankB;
-          return b.createdAt.getTime() - a.createdAt.getTime();
-        });
-        onUpdate(loaded, true);
-      } else {
-        onUpdate(getInitialShuffledStories(), true);
-      }
+      loaded.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      onUpdate(loaded, true);
     },
     (error) => {
       try {
         handleFirestoreError(error, OperationType.LIST, 'stories');
       } catch {
-        // Fallback to local stories if offline/quota hit
-        const fallback = getLocalFallbackStories();
-        onUpdate(fallback, false);
+        onUpdate([], false);
       }
     }
   );
@@ -232,29 +139,34 @@ export function subscribeToApprovedStories(
   return unsubscribe;
 }
 
-function getLocalFallbackStories(): Story[] {
+/**
+ * Admin-only utility to physically delete pre-launch or legacy documents from `/stories` in Firestore.
+ * Uses the admin delete permission already configured in firestore.rules.
+ */
+export async function purgeLegacyGardenStories(): Promise<{
+  deletedCount: number;
+}> {
+  const path = 'stories';
   try {
-    const raw = localStorage.getItem(LOCAL_FALLBACK_KEY);
-    const custom: Story[] = raw ? JSON.parse(raw) : [];
-    const base = INITIAL_GARDEN_STORIES.map((s, idx) => ({
-      ...s,
-      createdAt: new Date(Date.now() - (idx + 1) * 3600 * 1000 * 6),
-      updatedAt: new Date(Date.now() - (idx + 1) * 3600 * 1000 * 6),
-    }));
-    return [
-      ...custom.map((c) => ({
-        ...c,
-        createdAt: new Date(c.createdAt),
-        updatedAt: new Date(c.updatedAt),
-      })),
-      ...base,
-    ];
-  } catch {
-    return INITIAL_GARDEN_STORIES.map((s) => ({
-      ...s,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    }));
+    const snap = await getDocs(collection(db, path));
+    const docsToDelete = snap.docs.filter(
+      (d) => !d.id.startsWith(LAUNCH_STORY_ID_PREFIX)
+    );
+    if (docsToDelete.length === 0) {
+      return { deletedCount: 0 };
+    }
+
+    let deletedCount = 0;
+    for (let i = 0; i < docsToDelete.length; i += 400) {
+      const batch = writeBatch(db);
+      const slice = docsToDelete.slice(i, i + 400);
+      slice.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+      deletedCount += slice.length;
+    }
+    return { deletedCount };
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
 
@@ -264,6 +176,7 @@ export interface PlantStoryInput {
   contentWarning?: string;
   anonymousId?: string;
   existingStories: Story[];
+  targetFlower?: AmbientMeadowFlower | null;
 }
 
 export async function plantNewStory(input: PlantStoryInput): Promise<Story> {
@@ -276,7 +189,9 @@ export async function plantNewStory(input: PlantStoryInput): Promise<Story> {
   // Strict sanitization & blueprint validation
   const trimmedContent = input.content.trim().slice(0, 2000);
   if (trimmedContent.length < 5) {
-    throw new Error('Please write at least a few words (minimum 5 characters) to plant your seed.');
+    throw new Error(
+      'Please write at least a few words (minimum 5 characters) to plant your seed.'
+    );
   }
 
   // Deterministic + Gemini AI moderation check
@@ -292,15 +207,31 @@ export async function plantNewStory(input: PlantStoryInput): Promise<Story> {
   }
 
   const cleanWarning = (input.contentWarning || '').trim().slice(0, 120);
-  const storyId = `story_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const storyId = `${LAUNCH_STORY_ID_PREFIX}${Date.now()}_${Math.random()
+    .toString(36)
+    .substring(2, 8)}`;
   const anonymousId =
     input.anonymousId && /^Anonymous Soul #[0-9]{3,6}$/.test(input.anonymousId)
       ? input.anonymousId
       : generateAnonymousSoulId();
-  const flowerVariant = pickFlowerVariantForSeed(input.seedType);
 
-  // Pick a balanced meadow coordinate that avoids overlapping existing flowers
-  const { positionX, positionY, scale } = findHarmoniousPosition(input.existingStories);
+  // If user clicked a specific empty meadow flower, bloom right on that flower's spot;
+  // otherwise claim an unoccupied ambient flower slot first before picking a fresh coordinate.
+  const chosenSlot =
+    input.targetFlower || findAvailableAmbientSlot(input.existingStories);
+
+  const flowerVariant =
+    chosenSlot && chosenSlot.seedType === input.seedType
+      ? chosenSlot.flowerVariant
+      : pickFlowerVariantForSeed(input.seedType);
+
+  const { positionX, positionY, scale } = chosenSlot
+    ? {
+        positionX: chosenSlot.positionX,
+        positionY: chosenSlot.positionY,
+        scale: chosenSlot.scale,
+      }
+    : findHarmoniousPosition(input.existingStories);
 
   const newStory: Story = {
     storyId,
@@ -345,6 +276,20 @@ export async function plantNewStory(input: PlantStoryInput): Promise<Story> {
   }
 }
 
+function findAvailableAmbientSlot(
+  existing: Story[]
+): AmbientMeadowFlower | null {
+  const freeSlots = AMBIENT_MEADOW_FLOWERS.filter((slot) =>
+    existing.every((s) => {
+      const dx = s.positionX - slot.positionX;
+      const dy = s.positionY - slot.positionY;
+      return Math.sqrt(dx * dx + dy * dy) > 3.5;
+    })
+  );
+  if (freeSlots.length === 0) return null;
+  return freeSlots[Math.floor(Math.random() * freeSlots.length)];
+}
+
 function findHarmoniousPosition(existing: Story[]): {
   positionX: number;
   positionY: number;
@@ -386,7 +331,9 @@ export async function sendWarmthReaction(
   story: Story,
   reactionType: ReactionType = 'warmth'
 ): Promise<void> {
-  const reactionId = `rx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const reactionId = `rx_${Date.now()}_${Math.random()
+    .toString(36)
+    .substring(2, 7)}`;
   const storyRef = doc(db, 'stories', story.storyId);
   const reactionRef = doc(db, 'stories', story.storyId, 'reactions', reactionId);
 
@@ -435,7 +382,9 @@ export async function leaveSupportiveMessage(
     );
   }
 
-  const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const messageId = `msg_${Date.now()}_${Math.random()
+    .toString(36)
+    .substring(2, 7)}`;
   const anonymousId = generateKindGardenerId();
 
   const storyRef = doc(db, 'stories', story.storyId);
@@ -497,7 +446,6 @@ export function subscribeToStoryMessages(
       snapshot.forEach((docSnap) => {
         const d = docSnap.data();
         const msgContent = String(d.content || '');
-        // Hide any previously submitted harmful or insulting messages (e.g., "pathetic")
         if (!checkSupportiveReplyLocal(msgContent).allowed) {
           return;
         }
@@ -511,17 +459,6 @@ export function subscribeToStoryMessages(
         });
       });
 
-      // Merge any pre-seeded initial supportive messages for initial stories
-      const preset = INITIAL_SUPPORTIVE_MESSAGES[cleanStoryId] || [];
-      for (const p of preset) {
-        if (!list.some((m) => m.messageId === p.messageId)) {
-          list.push({
-            ...p,
-            createdAt: new Date(Date.now() - 3600 * 1000 * 3),
-          });
-        }
-      }
-
       list.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
       onUpdate(list);
     },
@@ -529,13 +466,7 @@ export function subscribeToStoryMessages(
       try {
         handleFirestoreError(error, OperationType.LIST, path);
       } catch {
-        const raw = localStorage.getItem(LOCAL_MESSAGES_KEY);
-        const allLocal: Record<string, SupportiveMessage[]> = raw ? JSON.parse(raw) : {};
-        const preset = (INITIAL_SUPPORTIVE_MESSAGES[cleanStoryId] || []).map((p) => ({
-          ...p,
-          createdAt: new Date(Date.now() - 3600 * 1000 * 3),
-        }));
-        onUpdate(allLocal[cleanStoryId] || preset);
+        onUpdate([]);
       }
     }
   );
@@ -548,7 +479,9 @@ export async function reportStoryContent(
   reason: 'self-harm' | 'harassment' | 'spam' | 'pii' | 'other',
   details: string
 ): Promise<void> {
-  const reportId = `rep_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const reportId = `rep_${Date.now()}_${Math.random()
+    .toString(36)
+    .substring(2, 7)}`;
   const cleanDetails = details.trim().slice(0, 500);
   const path = `reports/${reportId}`;
 

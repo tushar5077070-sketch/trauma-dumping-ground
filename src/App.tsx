@@ -352,10 +352,10 @@ export default function App() {
       {/* 2. Top Navigation & Sky Sanctuary Overlay — Responsive Across Mobile, Tablet (Portrait/Landscape) & Laptop */}
       <div className="pointer-events-none fixed inset-x-0 top-0 h-[52dvh] min-h-[240px] max-h-[520px] z-40 flex flex-col justify-between pb-2 sm:pb-4">
         <header className="pointer-events-auto w-full px-3 sm:px-5 md:px-7 lg:px-10 py-2.5 sm:py-3.5 lg:py-4 bg-gradient-to-b from-slate-950/30 via-slate-900/12 to-transparent">
-          {/* Mobile Header (< sm): Row 1 has Brand + About, How It Works, Privacy, Gmail/Sign In; Row 2 below has My Space & Plant a Seed */}
-          <div className="sm:hidden max-w-7xl mx-auto flex flex-col gap-2">
+          {/* Mobile & Tablet Header (< lg / 1024px): Row 1 has Brand + About, How It Works, Privacy, Gmail/Sign In; Row 2 below has My Inner Garden, My Space & Plant a Seed */}
+          <div className="lg:hidden max-w-7xl mx-auto flex flex-col gap-2 sm:gap-2.5">
             {/* Row 1: Brand on left + About, How It Works, Privacy & Gmail/Account on right */}
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 sm:gap-4">
               <a
                 href="#top"
                 onClick={(e) => {
@@ -364,15 +364,15 @@ export default function App() {
                   setIsWriteModalOpen(false);
                   setActiveInfoModal(null);
                 }}
-                className="inline-flex items-center gap-1 font-editorial text-lg min-[400px]:text-xl font-semibold tracking-tight text-white drop-shadow-sm whitespace-nowrap shrink-0"
+                className="inline-flex items-center gap-1 sm:gap-1.5 font-editorial text-lg min-[400px]:text-xl sm:text-2xl font-semibold tracking-tight text-white drop-shadow-sm whitespace-nowrap shrink-0"
               >
-                <Flower2 className="w-4 h-4 text-pink-100 shrink-0" />
+                <Flower2 className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-pink-100 shrink-0" />
                 <span>Unsaid</span>
               </a>
 
               <nav
-                aria-label="Primary mobile navigation"
-                className="flex items-center justify-end gap-2 min-[400px]:gap-2.5 text-[11px] min-[400px]:text-xs font-medium text-white/95 min-w-0"
+                aria-label="Primary mobile and tablet navigation"
+                className="flex items-center justify-end gap-2 min-[400px]:gap-2.5 sm:gap-4 text-[11px] min-[400px]:text-xs sm:text-sm font-medium text-white/95 min-w-0"
               >
                 <button
                   type="button"
@@ -391,10 +391,11 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => openPrivacyTrustModal('overview')}
-                  className="py-1 hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
+                  className="inline-flex items-center gap-1 py-1 hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
                   title="Inspect Unsaid Privacy & Data Ownership"
                 >
-                  Privacy
+                  <ShieldCheck className="hidden sm:inline w-3.5 h-3.5 text-emerald-100 shrink-0" />
+                  <span>Privacy</span>
                 </button>
 
                 {/* Gmail / Account Button */}
@@ -402,7 +403,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setIsAccountModalOpen(true)}
-                    className="inline-flex items-center gap-1 pl-0.5 pr-2 py-0.5 rounded-full bg-white/25 hover:bg-white/35 border border-white/40 text-[11px] font-medium text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
+                    className="inline-flex items-center gap-1 sm:gap-1.5 pl-0.5 sm:pl-1 pr-2 sm:pr-2.5 py-0.5 rounded-full bg-white/25 hover:bg-white/35 border border-white/40 text-[11px] sm:text-xs font-medium text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
                     title="View account and subscription plan"
                   >
                     {currentUser.photoURL ? (
@@ -417,27 +418,29 @@ export default function App() {
                         {firstName.charAt(0).toUpperCase()}
                       </span>
                     )}
-                    <span className="max-w-[54px] truncate">{firstName}</span>
+                    <span className="max-w-[54px] sm:max-w-[96px] truncate">
+                      {firstName}
+                    </span>
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setIsAccountModalOpen(true)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-white/22 hover:bg-white/35 border border-white/40 text-[11px] font-medium text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
+                    className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-full bg-white/22 hover:bg-white/35 border border-white/40 text-[11px] sm:text-xs font-medium text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
                   >
-                    <LogIn className="w-3 h-3 shrink-0" />
+                    <LogIn className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                     <span>Sign In</span>
                   </button>
                 )}
               </nav>
             </div>
 
-            {/* Row 2 directly below: My Space, My Inner Garden & Plant a Seed CTA */}
-            <div className="flex flex-wrap items-center justify-end gap-1.5 min-[400px]:gap-2">
+            {/* Row 2 directly below: My Inner Garden, My Space & Plant a Seed CTA */}
+            <div className="flex flex-wrap items-center justify-end gap-1.5 min-[400px]:gap-2 sm:gap-2.5">
               <button
                 type="button"
                 onClick={() => setIsInnerGardenOpen(true)}
-                className="inline-flex items-center gap-1 py-1.5 px-2.5 rounded-full bg-emerald-100/22 hover:bg-emerald-100/35 border border-emerald-100/45 text-[11px] min-[400px]:text-xs font-medium text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
+                className="inline-flex items-center gap-1 sm:gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-full bg-emerald-100/22 hover:bg-emerald-100/35 border border-emerald-100/45 text-[11px] min-[400px]:text-xs font-medium text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
                 title="Open your private My Inner Garden"
               >
                 <Sprout className="w-3.5 h-3.5 text-emerald-100 shrink-0" />
@@ -447,7 +450,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setIsMySpaceOpen(true)}
-                className="inline-flex items-center gap-1 py-1.5 px-2.5 rounded-full bg-rose-100/22 hover:bg-rose-100/35 border border-rose-100/45 text-[11px] min-[400px]:text-xs font-medium text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
+                className="inline-flex items-center gap-1 sm:gap-1.5 py-1.5 px-2.5 sm:px-3 rounded-full bg-rose-100/22 hover:bg-rose-100/35 border border-rose-100/45 text-[11px] min-[400px]:text-xs font-medium text-white transition-colors whitespace-nowrap cursor-pointer drop-shadow-xs shrink-0"
                 title="Open your private My Space"
               >
                 <BookHeart className="w-3.5 h-3.5 text-rose-100 shrink-0" />
@@ -457,7 +460,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={handleOpenGeneralPlanting}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md border border-white/25 text-[11px] min-[400px]:text-xs font-medium text-white shadow-sm transition-all whitespace-nowrap cursor-pointer shrink-0"
+                className="inline-flex items-center gap-1 sm:gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-900 backdrop-blur-md border border-white/25 text-[11px] min-[400px]:text-xs font-medium text-white shadow-sm transition-all whitespace-nowrap cursor-pointer shrink-0"
               >
                 <span>Plant a Seed 🌱</span>
               </button>
@@ -466,7 +469,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setIsAdminModalOpen(true)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-amber-400/90 hover:bg-amber-300 text-slate-950 border border-amber-200 text-[11px] font-semibold transition-colors whitespace-nowrap cursor-pointer shadow-xs shrink-0"
+                  className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-full bg-amber-400/90 hover:bg-amber-300 text-slate-950 border border-amber-200 text-[11px] sm:text-xs font-semibold transition-colors whitespace-nowrap cursor-pointer shadow-xs shrink-0"
                 >
                   <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
                   <span>Backend</span>
@@ -475,8 +478,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* Tablet & Desktop Header (sm and up): Clean single-row navigation without audio control */}
-          <div className="hidden sm:flex max-w-7xl mx-auto items-center justify-between gap-3 md:gap-4">
+          {/* Desktop Header (lg / 1024px and up): Clean single-row navigation without audio control */}
+          <div className="hidden lg:flex max-w-7xl mx-auto items-center justify-between gap-3 xl:gap-5">
             <a
               href="#top"
               onClick={(e) => {
@@ -485,16 +488,16 @@ export default function App() {
                 setIsWriteModalOpen(false);
                 setActiveInfoModal(null);
               }}
-              className="inline-flex items-center gap-2 font-editorial text-xl md:text-2xl lg:text-3xl font-semibold tracking-tight text-white drop-shadow-sm whitespace-nowrap shrink-0"
+              className="inline-flex items-center gap-2 font-editorial text-2xl xl:text-3xl font-semibold tracking-tight text-white drop-shadow-sm whitespace-nowrap shrink-0"
             >
-              <Flower2 className="w-4.5 h-4.5 lg:w-5 lg:h-5 text-pink-100 shrink-0" />
+              <Flower2 className="w-5 h-5 text-pink-100 shrink-0" />
               <span>Unsaid</span>
             </a>
 
-            <div className="flex items-center justify-end gap-2.5 md:gap-4 lg:gap-5 shrink-0">
+            <div className="flex items-center justify-end gap-2.5 xl:gap-4 shrink-0">
               <nav
                 aria-label="Primary navigation"
-                className="flex items-center justify-end gap-2.5 md:gap-4 lg:gap-5 text-xs md:text-sm font-medium text-white/95"
+                className="flex items-center justify-end gap-2.5 xl:gap-4 text-xs xl:text-sm font-medium text-white/95"
               >
                 <button
                   type="button"

@@ -6,12 +6,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { User } from 'firebase/auth';
 import {
+  Bell,
   Flower2,
   Compass,
   LogIn,
   ShieldCheck,
   BookHeart,
   Sprout,
+  Heart,
+  X,
 } from 'lucide-react';
 import {
   AMBIENT_MEADOW_FLOWERS,
@@ -22,6 +25,8 @@ import {
   InnerJournalEntry,
   InnerPrivacyPrefs,
   InnerReflectionMemory,
+  KindMessageNotification,
+  NotificationReadState,
   PlantedStoryReceipt,
   SavedMemory,
   SecretGardenMembership,
@@ -58,6 +63,12 @@ import {
   subscribeToInnerPrivacyPrefs,
   subscribeToInnerReflections,
 } from './services/innerGardenService';
+import {
+  isNotificationRead,
+  persistNotificationReadState,
+  subscribeToNotificationReadState,
+  subscribeToOwnStoryKindMessages,
+} from './services/notificationService';
 import { soundscape } from './utils/soundscape';
 import { LivingGardenCanvas } from './components/LivingGardenCanvas';
 import { WriteStoryModal } from './components/WriteStoryModal';
@@ -68,6 +79,7 @@ import { AdminBackendModal } from './components/AdminBackendModal';
 import { MySpaceModal } from './components/MySpaceModal';
 import { SecretGardenUpgradeModal } from './components/SecretGardenUpgradeModal';
 import { InnerGardenModal } from './components/InnerGardenModal';
+import { NotificationsModal } from './components/NotificationsModal';
 import {
   PrivacyTrustModal,
   PrivacyTrustTab,
@@ -117,10 +129,32 @@ export default function App() {
   const [ownPlantedStories, setOwnPlantedStories] = useState<
     PlantedStoryReceipt[]
   >([]);
+  const [kindNotifications, setKindNotifications] = useState<
+    KindMessageNotification[]
+  >([]);
+  const [notificationReadState, setNotificationReadState] =
+    useState<NotificationReadState>({
+      lastReadAtMs: 0,
+      readMessageIds: [],
+      existsInCloud: false,
+    });
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [liveToastNotification, setLiveToastNotification] =
+    useState<KindMessageNotification | null>(null);
   const [localCustomisation, setLocalCustomisation] =
     useState<GardenCustomisationSettings>(() => loadLocalGardenCustomisation());
 
   const visitedStoryIdsRef = useRef<Set<string>>(new Set());
+  const seenNotificationIdsRef = useRef<Set<string>>(new Set());
+  const notificationsInitializedRef = useRef<boolean>(false);
+  const toastTimerRef = useRef<number | null>(null);
+  const notificationReadStateRef = useRef<NotificationReadState>(
+    notificationReadState
+  );
+
+  useEffect(() => {
+    notificationReadStateRef.current = notificationReadState;
+  }, [notificationReadState]);
 
   useEffect(() => {
     const unsubscribe = subscribeToApprovedStories((loadedStories) => {
@@ -155,6 +189,15 @@ export default function App() {
       setInnerReflections([]);
       setInnerPrivacyPrefs(null);
       setOwnPlantedStories([]);
+      setKindNotifications([]);
+      setNotificationReadState({
+        lastReadAtMs: 0,
+        readMessageIds: [],
+        existsInCloud: false,
+      });
+      setLiveToastNotification(null);
+      seenNotificationIdsRef.current.clear();
+      notificationsInitializedRef.current = false;
       return;
     }
 
@@ -204,6 +247,10 @@ export default function App() {
       setOwnPlantedStories,
       () => {}
     );
+    const unsubNotifReadState = subscribeToNotificationReadState(
+      currentUser.uid,
+      setNotificationReadState
+    );
 
     return () => {
       unsubMembership();
@@ -214,8 +261,70 @@ export default function App() {
       unsubInnerReflections();
       unsubInnerPrefs();
       unsubOwnPlanted();
+      unsubNotifReadState();
     };
   }, [currentUser]);
+
+  // Subscribe in real time to kind messages arriving on any flower planted by the signed-in user
+  useEffect(() => {
+    if (!currentUser || ownPlantedStories.length === 0) {
+      setKindNotifications([]);
+      return;
+    }
+
+    const unsub = subscribeToOwnStoryKindMessages(
+      ownPlantedStories,
+      stories,
+      (merged, initialLoadComplete) => {
+        setKindNotifications(merged);
+
+        if (!notificationsInitializedRef.current) {
+          for (const item of merged) {
+            seenNotificationIdsRef.current.add(item.messageId);
+          }
+          if (initialLoadComplete) {
+            notificationsInitializedRef.current = true;
+          }
+          return;
+        }
+
+        // Detect brand-new kind message arriving live while the user is in the garden
+        const brandNew = merged.find(
+          (item) =>
+            !seenNotificationIdsRef.current.has(item.messageId) &&
+            !isNotificationRead(item, notificationReadStateRef.current)
+        );
+        for (const item of merged) {
+          seenNotificationIdsRef.current.add(item.messageId);
+        }
+
+        if (brandNew) {
+          soundscape.playBloomChord();
+          setLiveToastNotification(brandNew);
+          if (toastTimerRef.current) {
+            window.clearTimeout(toastTimerRef.current);
+          }
+          toastTimerRef.current = window.setTimeout(() => {
+            setLiveToastNotification((curr) =>
+              curr?.messageId === brandNew.messageId ? null : curr
+            );
+          }, 9000);
+        }
+      }
+    );
+
+    return () => {
+      unsub();
+    };
+  }, [currentUser, ownPlantedStories, stories]);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   const openPrivacyTrustModal = useCallback(
     (tab: PrivacyTrustTab = 'overview') => {
@@ -225,10 +334,92 @@ export default function App() {
     []
   );
 
-  const handleSelectStory = useCallback((story: Story) => {
-    visitedStoryIdsRef.current.add(story.storyId);
-    setActiveStory(story);
-  }, []);
+  const markMessagesRead = useCallback(
+    (messageIds: string[]) => {
+      if (!currentUser || messageIds.length === 0) return;
+      const prev = notificationReadStateRef.current;
+      const missing = messageIds.filter((id) => !prev.readMessageIds.includes(id));
+      if (missing.length === 0) return;
+
+      const next: NotificationReadState = {
+        ...prev,
+        readMessageIds: Array.from(
+          new Set([...missing, ...prev.readMessageIds])
+        ).slice(0, 180),
+      };
+      setNotificationReadState(next);
+      persistNotificationReadState(currentUser.uid, next).then((saved) => {
+        setNotificationReadState(saved);
+      });
+    },
+    [currentUser]
+  );
+
+  const handleMarkAllNotificationsRead = useCallback(() => {
+    if (!currentUser) return;
+    const prev = notificationReadStateRef.current;
+    const latestMsgTime = kindNotifications.reduce(
+      (max, item) => Math.max(max, item.createdAt.getTime()),
+      Date.now()
+    );
+    const next: NotificationReadState = {
+      ...prev,
+      lastReadAtMs: Math.max(Date.now(), latestMsgTime),
+      readMessageIds: Array.from(
+        new Set([
+          ...kindNotifications.map((n) => n.messageId),
+          ...prev.readMessageIds,
+        ])
+      ).slice(0, 180),
+    };
+    setNotificationReadState(next);
+    persistNotificationReadState(currentUser.uid, next).then((saved) => {
+      setNotificationReadState(saved);
+    });
+  }, [currentUser, kindNotifications]);
+
+  const handleSelectStory = useCallback(
+    (story: Story) => {
+      visitedStoryIdsRef.current.add(story.storyId);
+      setActiveStory(story);
+      // Automatically mark unread kind messages on this flower as read when opened
+      const storyUnreadIds = kindNotifications
+        .filter(
+          (n) =>
+            n.storyId === story.storyId &&
+            !isNotificationRead(n, notificationReadStateRef.current)
+        )
+        .map((n) => n.messageId);
+      if (storyUnreadIds.length > 0) {
+        markMessagesRead(storyUnreadIds);
+      }
+    },
+    [kindNotifications, markMessagesRead]
+  );
+
+  const handleOpenNotification = useCallback(
+    (notification: KindMessageNotification) => {
+      markMessagesRead([notification.messageId]);
+      setIsNotificationsOpen(false);
+      setLiveToastNotification((curr) =>
+        curr?.messageId === notification.messageId ? null : curr
+      );
+      const liveStory = stories.find((s) => s.storyId === notification.storyId);
+      if (liveStory) {
+        visitedStoryIdsRef.current.add(liveStory.storyId);
+        setActiveStory(liveStory);
+      }
+    },
+    [markMessagesRead, stories]
+  );
+
+  const unreadNotificationCount = useMemo(
+    () =>
+      kindNotifications.filter(
+        (n) => !isNotificationRead(n, notificationReadState)
+      ).length,
+    [kindNotifications, notificationReadState]
+  );
 
   const handleReadRandomStory = useCallback(() => {
     if (stories.length === 0) return;
@@ -445,6 +636,30 @@ export default function App() {
                   <span>Privacy</span>
                 </button>
 
+                {/* Notifications Bell (Signed-in Users) */}
+                {currentUser && (
+                  <button
+                    type="button"
+                    onClick={() => setIsNotificationsOpen(true)}
+                    aria-label={
+                      unreadNotificationCount > 0
+                        ? `Notifications (${unreadNotificationCount} unread)`
+                        : 'Notifications'
+                    }
+                    title="Kind messages on your flowers"
+                    className="relative inline-flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/22 hover:bg-white/35 border border-white/40 text-white transition-colors cursor-pointer drop-shadow-xs shrink-0"
+                  >
+                    <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    {unreadNotificationCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold leading-none flex items-center justify-center ring-2 ring-sky-400/70 shadow-xs tabular-nums">
+                        {unreadNotificationCount > 9
+                          ? '9+'
+                          : unreadNotificationCount}
+                      </span>
+                    )}
+                  </button>
+                )}
+
                 {/* Gmail / Account Button */}
                 {currentUser ? (
                   <button
@@ -587,6 +802,30 @@ export default function App() {
                   <BookHeart className="w-3.5 h-3.5 text-rose-100 shrink-0" />
                   <span>My Space</span>
                 </button>
+
+                {/* Desktop Notifications Bell (Signed-in Users) */}
+                {currentUser && (
+                  <button
+                    type="button"
+                    onClick={() => setIsNotificationsOpen(true)}
+                    aria-label={
+                      unreadNotificationCount > 0
+                        ? `Notifications (${unreadNotificationCount} unread)`
+                        : 'Notifications'
+                    }
+                    title="Kind messages on your flowers"
+                    className="relative inline-flex items-center justify-center w-8 h-8 rounded-full bg-white/22 hover:bg-white/35 border border-white/40 text-white transition-colors cursor-pointer drop-shadow-xs shrink-0"
+                  >
+                    <Bell className="w-4 h-4" />
+                    {unreadNotificationCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-rose-500 text-white text-[10px] font-bold leading-none flex items-center justify-center ring-2 ring-sky-400/70 shadow-xs tabular-nums">
+                        {unreadNotificationCount > 9
+                          ? '9+'
+                          : unreadNotificationCount}
+                      </span>
+                    )}
+                  </button>
+                )}
 
                 {/* Sign In / Account Button */}
                 {currentUser ? (
@@ -829,6 +1068,64 @@ export default function App() {
         innerPrivacyPrefs={innerPrivacyPrefs}
         onClose={() => setIsPrivacyModalOpen(false)}
       />
+
+      {/* 13. Real-Time Kind Message Notifications Center */}
+      <NotificationsModal
+        isOpen={isNotificationsOpen}
+        notifications={kindNotifications}
+        readState={notificationReadState}
+        ownPlantedStories={ownPlantedStories}
+        liveStories={stories}
+        onOpenNotification={handleOpenNotification}
+        onMarkAllRead={handleMarkAllNotificationsRead}
+        onStartPlanting={handleOpenGeneralPlanting}
+        onClose={() => setIsNotificationsOpen(false)}
+      />
+
+      {/* 14. Gentle Live Toast When a New Kind Message Arrives */}
+      {liveToastNotification && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-96 z-50 rounded-2xl bg-white/95 backdrop-blur-xl border border-rose-200/90 shadow-2xl p-3.5 flex items-start gap-3"
+        >
+          <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-200/80 flex items-center justify-center shrink-0 mt-0.5">
+            <Heart className="w-4 h-4 fill-rose-500 text-rose-500" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-slate-900">
+              Someone left a kind message on your flower
+            </p>
+            <p className="text-xs text-slate-600 mt-0.5 line-clamp-2 leading-relaxed">
+              “{liveToastNotification.messageContent}”
+            </p>
+            <div className="mt-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => handleOpenNotification(liveToastNotification)}
+                className="text-xs font-semibold text-rose-700 hover:text-rose-800 underline underline-offset-2 cursor-pointer"
+              >
+                Read Message
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsNotificationsOpen(true)}
+                className="text-xs font-medium text-slate-500 hover:text-slate-800 cursor-pointer"
+              >
+                View Inbox
+              </button>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setLiveToastNotification(null)}
+            aria-label="Dismiss notification"
+            className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

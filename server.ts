@@ -3,6 +3,12 @@ import express, { type Request, type Response } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
+import {
+  checkPlantedStoryLocal,
+  checkSupportiveReplyLocal,
+  deobfuscateText,
+  type ModerationCategory,
+} from './src/utils/moderationRules.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -583,13 +589,17 @@ Synthesize an empathetic, conversational ${periodTypeLabel} memory reflection ce
 
   // 6. Public Sanctuary Content Moderation (Supportive Messages & Planted Stories)
   app.post('/api/ai/moderate-content', async (req: Request, res: Response) => {
-    const { text, contentType, storyContext } = req.body as {
+    const { text, contentType, storyContext, contentWarning } = req.body as {
       text?: string;
       contentType?: 'supportive_message' | 'story';
       storyContext?: string;
+      contentWarning?: string;
     };
 
     const cleanText = typeof text === 'string' ? text.trim().slice(0, 2000) : '';
+    const cleanWarning =
+      typeof contentWarning === 'string' ? contentWarning.trim().slice(0, 120) : '';
+
     if (!cleanText) {
       return res.json({
         allowed: false,
@@ -598,94 +608,221 @@ Synthesize an empathetic, conversational ${periodTypeLabel} memory reflection ce
       });
     }
 
-    // Server-side deterministic blocklist (always runs even if Gemini is unavailable)
-    const lower = cleanText
-      .toLowerCase()
-      .replace(/@/g, 'a')
-      .replace(/0/g, 'o')
-      .replace(/1/g, 'i')
-      .replace(/3/g, 'e')
-      .replace(/\$/g, 's')
-      .replace(/!/g, 'i')
-      .replace(/([a-z])\1{2,}/g, '$1');
+    const isReply = contentType === 'supportive_message';
 
-    if (contentType === 'supportive_message') {
-      const blockedReplyRegex =
-        /\b(pathetic|worthless|useless|loser|losers|weak|weakling|stupid|idiot|idiotic|moron|dumb|dumbass|fool|clown|trash|garbage|filth|scum|scumbag|disgusting|gross|ugly|freak|weirdo|psycho|crazy|insane|delusional|retard|retarded|lame|cringe|cringey|corny|dramatic|overdramatic|overreacting|crybaby|whiner|whining|fake|liar|fraud|hypocrite|coward|selfish|narcissist|annoying|boring|ridiculous|laughable|pitiful|shameful|embarrassing|disgrace|failure|parasite|deserved|kys|stfu|gtfo|fuck|fucking|fucker|motherfucker|shit|bullshit|bitch|asshole|bastard|dick|pussy|cunt|slut|whore|faggot|nigger|nigga|boohoo|womp\s*womp|nobody\s+cares|no\s+one\s+cares|who\s+cares|shut\s+up|grow\s+up|man\s+up|get\s+over\s+it|stop\s+crying|cry\s+more|kill\s*your\s*self|go\s+die|attention\s+seeker|you\s+suck)\b/i;
+    // Step 1: Deterministic multilingual + de-obfuscation pre-filter
+    const localResult = isReply
+      ? checkSupportiveReplyLocal(cleanText)
+      : checkPlantedStoryLocal(cleanText);
+    if (!localResult.allowed) {
+      return res.json(localResult);
+    }
 
-      if (blockedReplyRegex.test(cleanText) || blockedReplyRegex.test(lower)) {
-        return res.json({
-          allowed: false,
-          category: 'insult_or_belittling',
-          reason:
-            'Unsaid only allows gentle, supportive replies. Insulting, dismissive, or hurtful words cannot be sent to someone sharing a vulnerable story.',
-        });
-      }
-    } else {
-      const blockedStoryRegex =
-        /\b(kill\s*your\s*self|k\s*y\s*s|you\s+should\s+die|faggot|nigger|nigga|kike|chink|spic)\b/i;
-      if (blockedStoryRegex.test(cleanText) || blockedStoryRegex.test(lower)) {
-        return res.json({
-          allowed: false,
-          category: 'harassment',
-          reason:
-            'Content containing hate speech, slurs, or encouragement of harm cannot be planted in the garden.',
-        });
+    if (cleanWarning) {
+      const warningLocal = checkPlantedStoryLocal(cleanWarning);
+      if (!warningLocal.allowed) {
+        return res.json(warningLocal);
       }
     }
+
+    const textViews = deobfuscateText(cleanText);
+    const warningViews = cleanWarning ? deobfuscateText(cleanWarning) : null;
+    const allObfuscatedTokens = Array.from(
+      new Set([
+        ...textViews.obfuscatedTokens,
+        ...(warningViews ? warningViews.obfuscatedTokens : []),
+      ])
+    );
 
     const ai = getGeminiClient();
     if (!ai) {
-      return res.json({ allowed: true, category: 'clean' });
+      return res.status(503).json({
+        allowed: false,
+        category: 'moderation_unavailable',
+        reason:
+          'AI safety verification is temporarily unavailable. Please try again in a moment.',
+      });
     }
 
-    try {
-      const isReply = contentType === 'supportive_message';
-      const prompt = isReply
-        ? `Story: """${(storyContext || '').slice(0, 260)}"""\nReply: """${cleanText}"""`
-        : `Story: """${cleanText.slice(0, 1200)}"""`;
+    const moderationSystemInstruction = isReply
+      ? `Strict safety & anonymity guardian for "Unsaid" (anonymous emotional sanctuary).
+Evaluate a public REPLY to someone's vulnerable story. Return allowed=false if ANY rule is violated (in English, Hindi, Hinglish, Devanagari, or any language, any case, or obfuscated):
+1. REAL PERSONAL NAMES / PII (detectedPersonalName=true, category="personal_name_or_pii"): ANY real person's first, last, or full name from ANY culture (Indian/South Asian like Tushar, Tushar Sharma, Rahul, Priya, Ananya, Rohan, Aarav, Neha, Aman, Kabir, or Western/global like John Smith, Sarah, Alex), even lowercase or disguised with symbols/spaces; phone numbers, emails, @handles, social IDs. Allow generic roles without names ("my mom", "friend", "someone") and ordinary nouns ("hope", "grace", "rain", "rose", "daisy") when clearly not naming a person.
+2. ABUSIVE / PROFANE LANGUAGE (detectedAbusiveLanguage=true, category="profanity_or_slur"): ANY English, Hindi, Hinglish, or Devanagari profanity, swear words, gaalis, slurs, or vulgar slang (fuck, shit, bitch, asshole, bastard, madarchod/mc, behenchod/bhenchod/bc, bhosdike/bsdk, chutiya/chut, gandu/gaand, lund/lauda/lodu, randi, harami, kamina, kutta/kutiya, saala, bhadwa, chinal, chod/chudai, jhaant, mkc, bkl, मादरचोद, बहनचोद, भोसड़ीके, चूतिया, गांडू, लंड, रंडी, हरामी, कमीना, कुत्ता, साला, भड़वा, etc.).
+3. UNKIND / DISMISSIVE / HOSTILE TONE (category="insult_or_belittling" | "dismissive_or_mocking" | "harassment" | "self_harm_or_threat"): Mocking, insulting, blaming, dismissing pain, or encouraging harm.
+Allow ONLY warm, supportive, anonymous replies. If blocked, write a calm 1-sentence reason without repeating the name or profanity.`
+      : `Strict safety & anonymity guardian for "Unsaid" (anonymous emotional sanctuary).
+Evaluate a public STORY before planting. Return allowed=false if ANY rule is violated (in English, Hindi, Hinglish, Devanagari, or any language, any capitalization, or disguised spelling):
+1. REAL PERSONAL NAMES / PII (detectedPersonalName=true, category="personal_name_or_pii"):
+   - Block ANY real person's first name, surname, or full name from ANY culture (e.g. Tushar, Tushar Sharma, tushar verma, Rahul Kumar, Priya, Ananya, Rohan, Aarav, Neha, Aman, Kabir, Pooja, Abhishek, Ritika, John Smith, Sarah, Emily, Michael, etc.), even all lowercase ("tushar sharma", "i hate rahul") or disguised with symbols/spaces/leetspeak ("T*u*s*h*a*r", "T.u.s.h.a.r", "Tu$h@r").
+   - Block phone numbers, emails, @handles, Instagram/Snapchat/WhatsApp IDs, or doxxing.
+   - ALLOW anonymous relationship roles with NO personal name ("my mom", "my dad", "my ex", "my best friend", "my partner", "my boss", "someone I loved") and ordinary words ("hope", "grace", "joy", "summer", "dawn", "rain", "rose", "daisy", "sunflower", "lavender", "unsaid") when NOT naming a real person.
+2. ABUSIVE / PROFANE / VULGAR LANGUAGE (detectedAbusiveLanguage=true, category="profanity_or_slur"):
+   - Block ALL English profanity/slurs/curses (fuck, f*ck, shit, bitch, asshole, bastard, cunt, dick, pussy, slut, whore, retard, motherfucker, etc.).
+   - Block ALL Hindi, Hinglish (Romanized Hindi), and Devanagari abuses, gaalis, curses, and vulgar slang (madarchod, mc, behenchod, bhenchod, bc, bhosdike, bsdk, chutiya, chut, gandu, gaand, lund, lauda, lavda, lodu, randi, raand, harami, haramkhor, haramzada, kamina, kutta, kutti, kutiya, saala, saale, bhadwa, chinal, dalla, chod, chodu, chudai, jhaant, jhatu, bakchod, tharki, mkc, bkl, tmkc, maa ki chut, teri maa ki, gaand mara, मादरचोद, बहनचोद, भोसड़ीके, चूतिया, गांडू, लंड, रंडी, हरामी, कमीना, कुत्ता, साला, भड़वा, चोद, etc.).
+3. HARASSMENT, HATE SPEECH, THREATS, SELF-HARM ENCOURAGEMENT, OR SPAM (category="harassment" | "self_harm_or_threat" | "spam").
+4. ALLOW honest, respectful anonymous emotional stories in English, Hindi, or Hinglish (grief, heartbreak, loneliness, sadness, anxiety, burnout, regret, healing) with NO personal names/PII and NO abusive language.
+Examples:
+- "Tushar Sharma broke my trust" -> allowed=false, detectedPersonalName=true, detectedAbusiveLanguage=false, category="personal_name_or_pii"
+- "tushar verma is so mean" -> allowed=false, detectedPersonalName=true, detectedAbusiveLanguage=false, category="personal_name_or_pii"
+- "ye sab bhosdike aur chutiye hain" -> allowed=false, detectedPersonalName=false, detectedAbusiveLanguage=true, category="profanity_or_slur"
+- "तुम सब कमीने हो" -> allowed=false, detectedPersonalName=false, detectedAbusiveLanguage=true, category="profanity_or_slur"
+- "I miss someone I used to talk to every night and feel really lonely." -> allowed=true, detectedPersonalName=false, detectedAbusiveLanguage=false, category="clean"
+- "Aaj dil bahut bhari lag raha hai, kisi ko samjha nahi pa raha." -> allowed=true, detectedPersonalName=false, detectedAbusiveLanguage=false, category="clean"
+If blocked, write a brief, gentle 1-sentence reason without repeating the name or profanity.`;
+
+    const promptParts: string[] = [];
+    if (isReply && storyContext) {
+      promptParts.push(`Story: """${storyContext.slice(0, 260)}"""`);
+    }
+    promptParts.push(`Original text:\n"""${textViews.cleanOriginal.slice(0, 1500)}"""`);
+    if (textViews.deobfuscatedReadable !== textViews.cleanOriginal) {
+      promptParts.push(
+        `De-obfuscated text:\n"""${textViews.deobfuscatedReadable.slice(0, 1500)}"""`
+      );
+    }
+    if (allObfuscatedTokens.length > 0) {
+      promptParts.push(
+        `Decoded obfuscated words: ${allObfuscatedTokens.slice(0, 12).join(', ')}`
+      );
+    }
+    if (cleanWarning) {
+      promptParts.push(
+        `Content warning: """${warningViews?.deobfuscatedReadable || cleanWarning}"""`
+      );
+    }
+
+    const callModerationModel = async (
+      model: 'gemini-3.1-flash-lite' | 'gemini-4-hydrogen',
+      timeoutMs: number
+    ) => {
+      const thinkingLevel =
+        model === 'gemini-3.1-flash-lite'
+          ? ThinkingLevel.MINIMAL
+          : ThinkingLevel.LOW;
 
       const aiRequest = ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite',
-        contents: prompt,
+        model,
+        contents: promptParts.join('\n\n'),
         config: {
-          thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
-          systemInstruction: isReply
-            ? 'Safety check for a kind reply on an emotional story. Return allowed=false ONLY if insulting, mocking, dismissive, profane, hostile, or encouraging harm; else allowed=true with empty reason. If blocked, give a brief gentle 1-sentence reason.'
-            : 'Safety check for an anonymous personal emotional story. Allow grief, sadness, trauma, heartbreak, anxiety, and burnout. Return allowed=false ONLY for hate speech/slurs, targeted bullying/harassment, encouraging self-harm/violence, or obvious spam; else allowed=true with empty reason.',
+          thinkingConfig: { thinkingLevel },
+          systemInstruction: moderationSystemInstruction,
           responseMimeType: 'application/json',
           responseSchema: {
             type: Type.OBJECT,
             properties: {
               allowed: { type: Type.BOOLEAN },
+              detectedPersonalName: { type: Type.BOOLEAN },
+              detectedAbusiveLanguage: { type: Type.BOOLEAN },
+              category: { type: Type.STRING },
               reason: { type: Type.STRING },
             },
-            required: ['allowed', 'reason'],
+            required: [
+              'allowed',
+              'detectedPersonalName',
+              'detectedAbusiveLanguage',
+              'category',
+              'reason',
+            ],
           },
         },
       });
 
-      const timeoutPromise = new Promise<null>((resolve) =>
-        setTimeout(() => resolve(null), 2200)
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('MODERATION_TIMEOUT')), timeoutMs)
       );
 
-      const response = await Promise.race([aiRequest, timeoutPromise]);
-      if (!response) {
-        return res.json({ allowed: true, category: 'clean', reason: '' });
-      }
+      return await Promise.race([aiRequest, timeoutPromise]);
+    };
 
+    let response;
+    try {
+      // Primary: ultra-fast, high-quota gemini-3.1-flash-lite with structured schema (~1.0-1.5s)
+      response = await callModerationModel('gemini-3.1-flash-lite', 3800);
+    } catch (primaryErr) {
+      console.error(
+        '[Moderation Primary Error]',
+        primaryErr instanceof Error ? primaryErr.message : primaryErr
+      );
+      // Fallback: gemini-4-hydrogen with ThinkingLevel.LOW
+      try {
+        response = await callModerationModel('gemini-4-hydrogen', 4500);
+      } catch (fallbackErr) {
+        console.error(
+          '[Moderation Fallback Error]',
+          fallbackErr instanceof Error ? fallbackErr.message : fallbackErr
+        );
+        return res.status(503).json({
+          allowed: false,
+          category: 'moderation_unavailable',
+          reason:
+            fallbackErr instanceof Error &&
+            fallbackErr.message === 'MODERATION_TIMEOUT'
+              ? 'Our safety check took a little longer than expected. Please tap again in a moment.'
+              : 'Our safety guardian could not verify this post right now. Please try again in a moment.',
+        });
+      }
+    }
+
+    try {
       const parsed = JSON.parse((response.text ?? '{}').trim()) as {
         allowed?: boolean;
+        detectedPersonalName?: boolean;
+        detectedAbusiveLanguage?: boolean;
+        category?: string;
         reason?: string;
       };
 
+      const hasName = parsed.detectedPersonalName === true;
+      const hasAbuse = parsed.detectedAbusiveLanguage === true;
+      const isAllowed = parsed.allowed === true && !hasName && !hasAbuse;
+
+      if (isAllowed) {
+        return res.json({ allowed: true, category: 'clean', reason: '' });
+      }
+
+      let category: ModerationCategory = 'unkind_tone';
+      if (hasName || parsed.category === 'personal_name_or_pii') {
+        category = 'personal_name_or_pii';
+      } else if (hasAbuse || parsed.category === 'profanity_or_slur') {
+        category = 'profanity_or_slur';
+      } else if (
+        parsed.category === 'insult_or_belittling' ||
+        parsed.category === 'dismissive_or_mocking' ||
+        parsed.category === 'self_harm_or_threat' ||
+        parsed.category === 'harassment' ||
+        parsed.category === 'spam' ||
+        parsed.category === 'unkind_tone'
+      ) {
+        category = parsed.category;
+      }
+
+      let reason = String(parsed.reason || '').trim().slice(0, 260);
+      if (!reason) {
+        if (category === 'personal_name_or_pii') {
+          reason =
+            'Real personal names or identifying details (including disguised spellings) cannot be shared in the meadow. Please remove the name to protect anonymity.';
+        } else if (category === 'profanity_or_slur') {
+          reason =
+            'Abusive or profane language (in English, Hindi, or Hinglish) cannot be posted in Unsaid. Please rephrase gently.';
+        } else {
+          reason =
+            'Our sanctuary guardian paused this post because it may be harmful, targeted, or disrespectful. Please edit and try again.';
+        }
+      }
+
       return res.json({
-        allowed: parsed.allowed !== false,
-        category: parsed.allowed === false ? 'unkind_tone' : 'clean',
-        reason: String(parsed.reason || ''),
+        allowed: false,
+        category,
+        reason,
       });
     } catch {
-      return res.json({ allowed: true, category: 'clean', reason: '' });
+      return res.status(503).json({
+        allowed: false,
+        category: 'moderation_unavailable',
+        reason:
+          'Unable to complete the safety check right now. Please try submitting again.',
+      });
     }
   });
 

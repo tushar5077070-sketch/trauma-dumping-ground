@@ -45,6 +45,7 @@ import {
   deleteModerationReportAsAdmin,
   deleteStoryAsAdmin,
   purgeLegacyGardenStories,
+  subscribeToAllLiveStoriesForAdmin,
 } from '../services/gardenService';
 
 interface AdminBackendModalProps {
@@ -97,6 +98,7 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
   const [loginEvents, setLoginEvents] = useState<LoginEvent[]>([]);
   const [subscriptions, setSubscriptions] = useState<SubscriptionRecord[]>([]);
   const [reports, setReports] = useState<ModerationReportRecord[]>([]);
+  const [adminStories, setAdminStories] = useState<Story[] | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | SubscriptionStatus>(
     'all'
@@ -159,12 +161,17 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
     const unsubEvents = subscribeToAllLoginEvents(setLoginEvents, handleErr);
     const unsubSubs = subscribeToAllSubscriptions(setSubscriptions, handleErr);
     const unsubReports = subscribeToAllReports(setReports, handleErr);
+    const unsubAdminStories = subscribeToAllLiveStoriesForAdmin(
+      setAdminStories,
+      handleErr
+    );
 
     return () => {
       unsubUsers();
       unsubEvents();
       unsubSubs();
       unsubReports();
+      unsubAdminStories();
     };
   }, [isOpen, isAdmin]);
 
@@ -218,25 +225,27 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
     });
   }, [subscriptions, searchQuery, statusFilter]);
 
+  const allAdminStories = adminStories ?? stories;
+
   const filteredStories = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return stories;
-    return stories.filter(
+    if (!q) return allAdminStories;
+    return allAdminStories.filter(
       (s) =>
         s.content.toLowerCase().includes(q) ||
         s.seedType.toLowerCase().includes(q) ||
         s.contentWarning.toLowerCase().includes(q) ||
         s.storyId.toLowerCase().includes(q)
     );
-  }, [stories, searchQuery]);
+  }, [allAdminStories, searchQuery]);
 
   const storyByIdMap = useMemo(() => {
     const map = new Map<string, Story>();
-    for (const st of stories) {
+    for (const st of allAdminStories) {
       map.set(st.storyId, st);
     }
     return map;
-  }, [stories]);
+  }, [allAdminStories]);
 
   const activeSubsCount = useMemo(
     () =>
@@ -529,7 +538,7 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
                 }`}
               >
                 <Flower2 className="w-3.5 h-3.5" />
-                <span>Stories ({stories.length})</span>
+                <span>Stories ({allAdminStories.length})</span>
               </button>
               <button
                 type="button"

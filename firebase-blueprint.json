@@ -1134,6 +1134,53 @@
         "preview",
         "createdAt"
       ]
+    },
+    "NotificationState": {
+      "title": "NotificationState",
+      "description": "Strictly private owner-only read/seen state for kind message notifications received on the user's planted stories.",
+      "type": "object",
+      "properties": {
+        "stateId": {
+          "type": "string",
+          "description": "State document identifier (e.g., inbox).",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user owning this notification inbox state.",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "lastReadAtMs": {
+          "type": "integer",
+          "description": "Epoch milliseconds timestamp when the user last marked all notifications as read."
+        },
+        "readMessageIds": {
+          "type": "array",
+          "description": "Bounded list of individually read supportive message IDs (max 200)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when notification state was initialized."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when notification state was last updated."
+        }
+      },
+      "required": [
+        "stateId",
+        "userId",
+        "lastReadAtMs",
+        "readMessageIds",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -1196,6 +1243,10 @@
     "/userAccounts/{userId}/plantedStories/{storyId}": {
       "schema": "PlantedStoryReceipt",
       "description": "Strictly private owner-only ownership receipts allowing authors to remove their own planted stories while keeping public stories completely anonymous."
+    },
+    "/userAccounts/{userId}/notificationState/{stateId}": {
+      "schema": "NotificationState",
+      "description": "Strictly private owner-only read/seen state for in-app kind message notifications."
     }
   }
 }

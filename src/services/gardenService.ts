@@ -143,6 +143,60 @@ export function subscribeToApprovedStories(
 }
 
 /**
+ * Admin-only unfiltered live subscription to all post-launch stories in Firestore,
+ * ensuring the admin can view and permanently delete any story (including previously posted
+ * stories that are now hidden from the public meadow by the upgraded moderation filter).
+ */
+export function subscribeToAllLiveStoriesForAdmin(
+  onUpdate: (stories: Story[]) => void,
+  onError?: (err: Error) => void
+): () => void {
+  const q = query(
+    collection(db, 'stories'),
+    where('moderationStatus', '==', 'approved')
+  );
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const loaded: Story[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const storyId = String(data.storyId || docSnap.id);
+        if (!storyId.startsWith(LAUNCH_STORY_ID_PREFIX)) {
+          return;
+        }
+        loaded.push({
+          storyId,
+          anonymousId: String(data.anonymousId || 'Anonymous Soul #1048'),
+          content: String(data.content || ''),
+          seedType: (data.seedType as SeedType) || 'daisy',
+          flowerVariant:
+            (data.flowerVariant as FlowerVariant) || 'pink-tulip',
+          contentWarning: String(data.contentWarning || ''),
+          moderationStatus: 'approved',
+          warmthCount: Number(data.warmthCount ?? 0),
+          messageCount: Number(data.messageCount ?? 0),
+          positionX: Number(data.positionX ?? 50),
+          positionY: Number(data.positionY ?? 50),
+          scale: Number(data.scale ?? 1),
+          createdAt: toDate(data.createdAt),
+          updatedAt: toDate(data.updatedAt),
+        });
+      });
+      loaded.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      onUpdate(loaded);
+    },
+    (error) => {
+      try {
+        handleFirestoreError(error, OperationType.LIST, 'stories');
+      } catch (err) {
+        onError?.(err instanceof Error ? err : new Error(String(err)));
+      }
+    }
+  );
+}
+
+/**
  * Admin-only utility to physically delete pre-launch or legacy documents from `/stories` in Firestore.
  * Uses the admin delete permission already configured in firestore.rules.
  */
@@ -412,19 +466,20 @@ export async function plantNewStory(input: PlantStoryInput): Promise<Story> {
     );
   }
 
-  // Deterministic + Gemini AI moderation check
+  const cleanWarning = (input.contentWarning || '').trim().slice(0, 120);
+
+  // Deterministic + Gemini AI moderation check (covers both story text and optional content warning)
   const moderation = await moderatePublicContent({
     text: trimmedContent,
     contentType: 'story',
+    contentWarning: cleanWarning,
   });
   if (!moderation.allowed) {
     throw new Error(
       moderation.reason ||
-        'This story contains harmful or abusive language and cannot be planted.'
+        'This story contains personal names, identifying details, or abusive language and cannot be planted.'
     );
   }
-
-  const cleanWarning = (input.contentWarning || '').trim().slice(0, 120);
   const storyId = `${LAUNCH_STORY_ID_PREFIX}${Date.now()}_${Math.random()
     .toString(36)
     .substring(2, 8)}`;

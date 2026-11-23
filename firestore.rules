@@ -747,6 +747,35 @@ service cloud.firestore {
         data.createdAt is timestamp;
     }
 
+    function isValidNotificationState(data) {
+      return data.keys().hasAll([
+          'stateId',
+          'userId',
+          'lastReadAtMs',
+          'readMessageIds',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'stateId',
+          'userId',
+          'lastReadAtMs',
+          'readMessageIds',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.stateId) &&
+        isValidId(data.userId) &&
+        data.lastReadAtMs is int &&
+        data.lastReadAtMs >= 0 &&
+        data.lastReadAtMs <= 9000000000000 &&
+        data.readMessageIds is list &&
+        data.readMessageIds.size() <= 200 &&
+        (data.readMessageIds.size() == 0 || data.readMessageIds[0] is string) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
     // 4. Collection Rules: Stories
     match /stories/{storyId} {
       allow get: if isValidId(storyId) && (existing().moderationStatus == 'approved' || isAdmin());
@@ -1147,6 +1176,39 @@ service cloud.firestore {
 
         allow update: if false;
         allow delete: if isOwner(userId) && isValidId(userId) && isValidId(storyId);
+      }
+
+      // 6H. Strictly Private Notification Read/Seen State (Owner-Only)
+      match /notificationState/{stateId} {
+        allow get: if isOwner(userId) && isValidId(userId) && isValidId(stateId);
+        allow list: if isOwner(userId) && existing().userId == request.auth.uid;
+
+        allow create: if isOwner(userId) &&
+          request.auth.token.email_verified == true &&
+          isValidId(userId) &&
+          isValidId(stateId) &&
+          isValidNotificationState(incoming()) &&
+          incoming().stateId == stateId &&
+          incoming().userId == request.auth.uid &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+
+        allow update: if isOwner(userId) &&
+          request.auth.token.email_verified == true &&
+          isValidId(userId) &&
+          isValidId(stateId) &&
+          isValidNotificationState(incoming()) &&
+          incoming().stateId == existing().stateId &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'lastReadAtMs',
+            'readMessageIds',
+            'updatedAt'
+          ]);
+
+        allow delete: if isOwner(userId) && isValidId(userId) && isValidId(stateId);
       }
     }
 

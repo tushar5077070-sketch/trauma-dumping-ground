@@ -59,6 +59,22 @@ export interface SupportiveMessage {
   createdAt: Date;
 }
 
+export interface KindMessageNotification {
+  messageId: string;
+  storyId: string;
+  storyPreview: string;
+  seedType: SeedType;
+  flowerVariant: FlowerVariant;
+  messageContent: string;
+  createdAt: Date;
+}
+
+export interface NotificationReadState {
+  lastReadAtMs: number;
+  readMessageIds: string[];
+  existsInCloud?: boolean;
+}
+
 export interface Reaction {
   reactionId: string;
   storyId: string;

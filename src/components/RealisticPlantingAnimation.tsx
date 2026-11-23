@@ -744,18 +744,13 @@ export const RealisticPlantingAnimation: React.FC<
     };
 
     const render = (now: number) => {
-      const rawDt = Math.min(0.05, (now - prevPerf) / 1000);
-      const dt = rawDt * 1.45;
+      const dt = Math.min(0.05, (now - prevPerf) / 1000);
       prevPerf = now;
 
-      const GROWTH_SPEED = 2.7;
-      const realSec = (now - startPerf) * 0.001;
-      const elapsedMs = prefersReducedMotion
-        ? 5600
-        : (now - startPerf) * GROWTH_SPEED;
-      const tSec = realSec;
+      const elapsedMs = prefersReducedMotion ? 5600 : now - startPerf;
+      const tSec = elapsedMs * 0.001;
 
-      // Update React caption phase synchronously from accelerated simulation clock (~2.0s full bloom)
+      // Update React caption phase synchronously from simulation clock (~5.4s full bloom)
       if (elapsedMs < 900) {
         emitPhase('seed-falling');
       } else if (elapsedMs < 1850) {

@@ -45,7 +45,7 @@ export async function moderatePublicContent(params: {
 
   // Step 2: Server-side Gemini AI moderation (name detection, obfuscation, multilingual abuse)
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
   try {
     const res = await fetch('/api/ai/moderate-content', {
       method: 'POST',

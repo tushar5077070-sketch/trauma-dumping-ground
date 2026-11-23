@@ -728,30 +728,32 @@ If blocked, write a brief, gentle 1-sentence reason without repeating the name o
         },
       });
 
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('MODERATION_TIMEOUT')), timeoutMs)
-      );
+      // Prevent unhandled rejection if timeout wins the race and aiRequest later rejects
+      aiRequest.catch(() => {});
 
-      return await Promise.race([aiRequest, timeoutPromise]);
+      let timerId: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timerId = setTimeout(() => reject(new Error('MODERATION_TIMEOUT')), timeoutMs);
+      });
+
+      try {
+        return await Promise.race([aiRequest, timeoutPromise]);
+      } finally {
+        if (timerId !== undefined) {
+          clearTimeout(timerId);
+        }
+      }
     };
 
     let response;
     try {
-      // Primary: ultra-fast, high-quota gemini-3.1-flash-lite with structured schema (~1.0-1.5s)
-      response = await callModerationModel('gemini-3.1-flash-lite', 3800);
-    } catch (primaryErr) {
-      console.error(
-        '[Moderation Primary Error]',
-        primaryErr instanceof Error ? primaryErr.message : primaryErr
-      );
-      // Fallback: gemini-4-hydrogen with ThinkingLevel.LOW
+      // Primary: fast, high-quota gemini-3.1-flash-lite (~0.9-1.5s normal, 9s ceiling for cold starts)
+      response = await callModerationModel('gemini-3.1-flash-lite', 9000);
+    } catch {
+      // Graceful fallback to gemini-4-hydrogen with ThinkingLevel.LOW
       try {
-        response = await callModerationModel('gemini-4-hydrogen', 4500);
+        response = await callModerationModel('gemini-4-hydrogen', 9000);
       } catch (fallbackErr) {
-        console.error(
-          '[Moderation Fallback Error]',
-          fallbackErr instanceof Error ? fallbackErr.message : fallbackErr
-        );
         return res.status(503).json({
           allowed: false,
           category: 'moderation_unavailable',

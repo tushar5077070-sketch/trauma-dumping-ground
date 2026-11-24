@@ -1,6 +1,7 @@
 export type ModerationCategory =
   | 'clean'
   | 'personal_name_or_pii'
+  | 'sexual_content'
   | 'insult_or_belittling'
   | 'dismissive_or_mocking'
   | 'self_harm_or_threat'
@@ -166,9 +167,9 @@ export function deobfuscateText(raw: string): DeobfuscatedTextViews {
     }
   );
 
-  // 3. Collapse 3-letter spaced high-risk acronyms like "k y s", "m k c", "b k l", "a s s"
+  // 3. Collapse 3-letter spaced high-risk acronyms like "k y s", "m k c", "b k l", "a s s", "s e x", "x x x"
   readable = readable.replace(
-    /\b(k\s+y\s+s|m\s+k\s+c|b\s+k\s+l|b\s+k\s+c|m\s+k\s+l|a\s+s\s+s|f\s+u\s+k|f\s+c\s+k|b\s+c|m\s+c)\b/gi,
+    /\b(k\s+y\s+s|m\s+k\s+c|b\s+k\s+l|b\s+k\s+c|m\s+k\s+l|a\s+s\s+s|f\s+u\s+k|f\s+c\s+k|s\s+e\s+x|x\s+x\s+x|f\s+w\s+b|b\s+c|m\s+c)\b/gi,
     (match) => match.replace(/\s+/g, '')
   );
 
@@ -455,6 +456,101 @@ const HIGH_SEVERITY_COMPACT_STEMS = [
   'chutmarike',
 ];
 
+// -----------------------------------------------------------------------------
+// Multilingual Sexual / NSFW / Erotic / Solicitation Rules
+// -----------------------------------------------------------------------------
+
+// Censored sexual terms like s*x, s**x, p*rn, n*des, h*rny, b**bs, t*ts, p*nis, v*gina, m*sturbate
+const CENSORED_SEXUAL_REGEX =
+  /\b(s[*_#x@!.-]{1,2}x(?:y|ing|ting)?|p[*_#x@!.-]{1,2}rn(?:o|ography)?|n[*_#x@!.-]{1,2}d[e3*]s?|h[*_#x@!.-]{1,2}rny|b[*_#x@!.-]{1,2}b(?:s|ies)?|t[*_#x@!.-]{1,2}t(?:s|ties)?|p[*_#x@!.-]{1,2}n[i1*]s|v[*_#x@!.-]{1,2}g[i1*]na|c[*_#x@!.-]{1,2}m(?:ming|shot)?|m[*_#x@!.-]{1,2}sturbat(?:e|ing|ion)|[e3*]r[*_#x@!.-]{1,2}tic|org[*_#x@!.-]{1,2}sm|ch[*_#x@!.-]{1,2}ch[i1*]y?a?n?|s[*_#x@!.-]{1,2}mbhog)\b/i;
+
+// Strict word-bounded English explicit sexual/NSFW vocabulary (zero false positives on words like document, title, analysis, class, unisex)
+const ENGLISH_SEXUAL_WORD_REGEX =
+  /\b(sex|sexy|sexier|sexiest|sexting|sext|horny|porn|porno|pornography|pornographic|xxx|nsfw|nude|nudes|nudity|boob|boobs|boobie|boobies|tits|titties|titty|nipple|nipples|penis|penises|vagina|vaginal|clitoris|clit|genitals|genitalia|testicles|scrotum|vulva|cums|cumming|cumshot|jizz|semen|ejaculate|ejaculation|orgasm|orgasms|masturbate|masturbating|masturbation|fap|fapping|wank|wanking|blowjob|blowjobs|handjob|handjobs|footjob|rimjob|titjob|deepthroat|creampie|gangbang|threesome|foursome|orgy|orgies|bdsm|fetish|fetishes|kinky|erotic|erotica|smut|hentai|onlyfans|camgirl|camboy|stripper|stripping|lapdance|escort|prostitute|prostitution|hooker|milf|dilf|fwb|hookup|hookups|dildo|dildos|vibrator|vibrators|buttplug|fleshlight|condom|condoms|foreplay|cunnilingus|fellatio|sodomy|anal|boner|erection|hardon|wetdream|upskirt|panties|lingerie|cleavage)\b|(?<!magna\s)\bcum\b(?!\s+laude)/i;
+
+// English explicit sexual & hookup solicitation phrases
+const ENGLISH_SEXUAL_PHRASE_REGEX =
+  /\b(have\s+sex|had\s+sex|having\s+sex|want\s+sex|wanna\s+sex|do\s+sex|for\s+sex|oral\s+sex|anal\s+sex|phone\s+sex|video\s+sex|sex\s+chat|sex\s+video|sex\s+story|sex\s+stories|sex\s+tape|sex\s+toy|sex\s+toys|send\s+nudes|nude\s+pics?|nude\s+photos?|naked\s+(pic|pics|photo|photos|video|videos|body|girl|boy|woman|man|in\s+bed)|get\s+naked|no\s+clothes\s+on|without\s+clothes|take\s+off\s+(your|her|his|my)\s+clothes|in\s+bed\s+with\s+(me|you|her|him)|sleep\s+with\s+(me|you|her|him)|make\s+love|making\s+love|one\s+night\s+stand|friends\s+with\s+benefits|sugar\s+(daddy|mommy|baby)|hook\s+up|hooking\s+up|turned\s+on|turn\s+me\s+on|get\s+laid|getting\s+laid|eat\s+(me|you|her|him)\s+out|suck\s+(me|my|him|his)|jerk\s+off|jerking\s+off|jack\s+off|jacking\s+off|rub\s+one\s+out|touch\s+myself|touching\s+myself|finger\s+myself|fingering|69\s+position|doggy\s+style|missionary\s+position|naughty\s+(pics?|photos?|videos?|chat|night\s+in\s+bed)|sexual\s+(act|acts|fantasy|fantasies|desire|desires|pleasure|chat|pics?|photos?|videos?|favor|favors|service|services|content|intercourse|urge|urges|tension))\b/i;
+
+// Hindi / Hinglish (Romanized Hindi) explicit sexual words & phrases
+const HINDI_HINGLISH_SEXUAL_REGEX =
+  /\b(chuchi|chuchiyan|chuchiya|choochi|choochiyan|bobe|boobe|boobey|nangi|nanga|nange|sambhog|kamvasna|kaamvasna|vasna|vaasna|hawas|suhagrat|suhaagrat|muth|mutth|muthmar|mutthmar|hastmaithun|ashleel|ashlil|jism|blue\s+film|bf\s+video|sexy\s+(video|photo|pic|girl|ladki|bhabhi|aunty|chat|baat|story)|sex\s+(karna|krna|karne|krne|kiya|karenge|chahiye|chat|video|story|karo|kro)|nangi\s+(photo|pic|video|ladki|aurat|bhabhi|tasveer)|bistar\s+garam|raat\s+garam|garam\s+(bhabhi|aunty|ladki|kahani|story)|gandi\s+(baat|baatein|batein|video|photo|story)|muth\s+(mar|maar|marna|maarna|mara|maara|marne)|kapde\s+(utar|utaar|utarna|utaarna|utaro)|chumma|lip\s+kiss|french\s+kiss|raat\s+bitana|bistar\s+pe|bistar\s+par|lund\s+choos|chut\s+chat|choot\s+chat)\b/i;
+
+// Devanagari Hindi sexual / NSFW terms
+const DEVANAGARI_SEXUAL_TERMS = [
+  'सेक्स',
+  'सेक्सी',
+  'पॉर्न',
+  'पोर्न',
+  'अश्लील',
+  'संभोग',
+  'कामवासना',
+  'वासना',
+  'हवस',
+  'नंगी',
+  'नंगा',
+  'नंगे',
+  'चूची',
+  'चूचियां',
+  'चूचियाँ',
+  'स्तन',
+  'योनि',
+  'हस्तमैथुन',
+  'मुठ',
+  'मुट्ठ',
+  'न्यूड',
+  'न्यूड्स',
+  'गंदी बात',
+  'गंदी बातें',
+  'सुहागरात',
+  'ब्लू फिल्म',
+  'बिस्तर गरम',
+  'जिस्म',
+  'कपड़े उतार',
+  'सेक्स चैट',
+  'सेक्स वीडियो',
+];
+
+// Unambiguous long sexual stems safe to scan inside fully collapsed text (e.g. "b.l.o.w.j.o.b", "s e n d n u d e s")
+const SEXUAL_COMPACT_STEMS = [
+  'blowjob',
+  'handjob',
+  'footjob',
+  'rimjob',
+  'deepthroat',
+  'creampie',
+  'cumshot',
+  'gangbang',
+  'threesome',
+  'masturbat',
+  'pornograph',
+  'onlyfans',
+  'sendnudes',
+  'sexchat',
+  'sexvideo',
+  'sexstory',
+  'sexyvideo',
+  'nangiphoto',
+  'nangivideo',
+  'sambhog',
+  'kamvasna',
+  'kaamvasna',
+  'hastmaithun',
+  'bistargaram',
+  'suhagrat',
+  'bluefilm',
+  'gandibaat',
+  'fleshlight',
+  'buttplug',
+  'cunnilingus',
+  'fellatio',
+  'sexkarna',
+  'sexkrna',
+  'muthmar',
+  'mutthmar',
+  'chuchiyan',
+];
+
 // Additional words blocked in supportive replies ("Leave a kind message")
 const SUPPORTIVE_REPLY_BLOCKED_WORDS = new Set([
   'pathetic',
@@ -687,6 +783,70 @@ function checkAbusiveLanguage(views: DeobfuscatedTextViews): ModerationCheckResu
   return null;
 }
 
+function checkSexualContent(views: DeobfuscatedTextViews): ModerationCheckResult | null {
+  const textsToTest = [
+    views.cleanOriginal,
+    views.deobfuscatedReadable,
+    views.leetspeakNormalized,
+    views.singleRepeatNormalized,
+  ];
+
+  // 1. Censored sexual words (e.g., s*x, p*rn, n*des, h*rny, b**bs)
+  if (CENSORED_SEXUAL_REGEX.test(views.cleanOriginal)) {
+    return {
+      allowed: false,
+      category: 'sexual_content',
+      reason:
+        'Sexually explicit, erotic, or NSFW content (including censored spellings) is not allowed in Unsaid. This sanctuary is strictly for gentle emotional healing.',
+    };
+  }
+
+  // 2. English + Hindi/Hinglish explicit sexual words and phrases across all normalized views
+  for (const t of textsToTest) {
+    if (
+      ENGLISH_SEXUAL_WORD_REGEX.test(t) ||
+      ENGLISH_SEXUAL_PHRASE_REGEX.test(t) ||
+      HINDI_HINGLISH_SEXUAL_REGEX.test(t)
+    ) {
+      return {
+        allowed: false,
+        category: 'sexual_content',
+        reason:
+          'Sexually explicit, erotic, or NSFW content cannot be posted in Unsaid. Please keep the meadow safe and focused on emotional healing.',
+      };
+    }
+  }
+
+  // 3. Devanagari Hindi sexual / NSFW terms
+  const devCompact = views.devanagariNormalized;
+  for (const term of DEVANAGARI_SEXUAL_TERMS) {
+    if (devCompact.includes(term)) {
+      return {
+        allowed: false,
+        category: 'sexual_content',
+        reason:
+          'Sexually explicit or NSFW content cannot be posted in Unsaid. Please keep the meadow respectful and safe.',
+      };
+    }
+  }
+
+  // 4. Unambiguous sexual stems in fully collapsed text (e.g., "s.e.n.d.n.u.d.e.s", "m a s t u r b a t e")
+  const compactAlpha = views.leetspeakNormalized.replace(/[^a-z]/g, '');
+  const compactSingle = views.singleRepeatNormalized.replace(/[^a-z]/g, '');
+  for (const stem of SEXUAL_COMPACT_STEMS) {
+    if (compactAlpha.includes(stem) || compactSingle.includes(stem)) {
+      return {
+        allowed: false,
+        category: 'sexual_content',
+        reason:
+          'Sexually explicit or NSFW content (including spaced or disguised spellings) is not allowed in Unsaid.',
+      };
+    }
+  }
+
+  return null;
+}
+
 function checkDirectPiiLocal(views: DeobfuscatedTextViews): ModerationCheckResult | null {
   const { cleanOriginal, deobfuscatedReadable } = views;
 
@@ -751,6 +911,9 @@ export function checkPlantedStoryLocal(text: string): ModerationCheckResult {
   const abuseHit = checkAbusiveLanguage(views);
   if (abuseHit) return abuseHit;
 
+  const sexualHit = checkSexualContent(views);
+  if (sexualHit) return sexualHit;
+
   const piiHit = checkDirectPiiLocal(views);
   if (piiHit) return piiHit;
 
@@ -777,7 +940,11 @@ export function checkSupportiveReplyLocal(text: string): ModerationCheckResult {
   const abuseHit = checkAbusiveLanguage(views);
   if (abuseHit) return abuseHit;
 
-  // 2. Direct PII / personal names
+  // 2. Sexual / NSFW / erotic content
+  const sexualHit = checkSexualContent(views);
+  if (sexualHit) return sexualHit;
+
+  // 3. Direct PII / personal names
   const piiHit = checkDirectPiiLocal(views);
   if (piiHit) return piiHit;
 

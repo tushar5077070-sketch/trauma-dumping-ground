@@ -649,8 +649,9 @@ Synthesize an empathetic, conversational ${periodTypeLabel} memory reflection ce
 Evaluate a public REPLY to someone's vulnerable story. Return allowed=false if ANY rule is violated (in English, Hindi, Hinglish, Devanagari, or any language, any case, or obfuscated):
 1. REAL PERSONAL NAMES / PII (detectedPersonalName=true, category="personal_name_or_pii"): ANY real person's first, last, or full name from ANY culture (Indian/South Asian like Tushar, Tushar Sharma, Rahul, Priya, Ananya, Rohan, Aarav, Neha, Aman, Kabir, or Western/global like John Smith, Sarah, Alex), even lowercase or disguised with symbols/spaces; phone numbers, emails, @handles, social IDs. Allow generic roles without names ("my mom", "friend", "someone") and ordinary nouns ("hope", "grace", "rain", "rose", "daisy") when clearly not naming a person.
 2. ABUSIVE / PROFANE LANGUAGE (detectedAbusiveLanguage=true, category="profanity_or_slur"): ANY English, Hindi, Hinglish, or Devanagari profanity, swear words, gaalis, slurs, or vulgar slang (fuck, shit, bitch, asshole, bastard, madarchod/mc, behenchod/bhenchod/bc, bhosdike/bsdk, chutiya/chut, gandu/gaand, lund/lauda/lodu, randi, harami, kamina, kutta/kutiya, saala, bhadwa, chinal, chod/chudai, jhaant, mkc, bkl, मादरचोद, बहनचोद, भोसड़ीके, चूतिया, गांडू, लंड, रंडी, हरामी, कमीना, कुत्ता, साला, भड़वा, etc.).
-3. UNKIND / DISMISSIVE / HOSTILE TONE (category="insult_or_belittling" | "dismissive_or_mocking" | "harassment" | "self_harm_or_threat"): Mocking, insulting, blaming, dismissing pain, or encouraging harm.
-Allow ONLY warm, supportive, anonymous replies. If blocked, write a calm 1-sentence reason without repeating the name or profanity.`
+3. SEXUAL / NSFW / EROTIC / SUGGESTIVE CONTENT (detectedSexualContent=true, category="sexual_content"): ZERO tolerance for ANY sexually explicit, erotic, pornographic, NSFW, fetish, sexting, hookup/nudes solicitation, sexual flirting, or sexually suggestive messages (even subtle/coded advances without swear words, e.g., "wanna do something naughty in bed", "send pics", "let's get physical tonight", "come over no clothes", "gandi baat", "raat bitana", "sex chat", "horny", "nangi").
+4. UNKIND / DISMISSIVE / HOSTILE TONE (category="insult_or_belittling" | "dismissive_or_mocking" | "harassment" | "self_harm_or_threat"): Mocking, insulting, blaming, dismissing pain, or encouraging harm.
+Allow ONLY warm, supportive, anonymous, non-sexual replies. If blocked, write a calm 1-sentence reason without repeating the name, sexual content, or profanity.`
       : `Strict safety & anonymity guardian for "Unsaid" (anonymous emotional sanctuary).
 Evaluate a public STORY before planting. Return allowed=false if ANY rule is violated (in English, Hindi, Hinglish, Devanagari, or any language, any capitalization, or disguised spelling):
 1. REAL PERSONAL NAMES / PII (detectedPersonalName=true, category="personal_name_or_pii"):
@@ -660,16 +661,22 @@ Evaluate a public STORY before planting. Return allowed=false if ANY rule is vio
 2. ABUSIVE / PROFANE / VULGAR LANGUAGE (detectedAbusiveLanguage=true, category="profanity_or_slur"):
    - Block ALL English profanity/slurs/curses (fuck, f*ck, shit, bitch, asshole, bastard, cunt, dick, pussy, slut, whore, retard, motherfucker, etc.).
    - Block ALL Hindi, Hinglish (Romanized Hindi), and Devanagari abuses, gaalis, curses, and vulgar slang (madarchod, mc, behenchod, bhenchod, bc, bhosdike, bsdk, chutiya, chut, gandu, gaand, lund, lauda, lavda, lodu, randi, raand, harami, haramkhor, haramzada, kamina, kutta, kutti, kutiya, saala, saale, bhadwa, chinal, dalla, chod, chodu, chudai, jhaant, jhatu, bakchod, tharki, mkc, bkl, tmkc, maa ki chut, teri maa ki, gaand mara, मादरचोद, बहनचोद, भोसड़ीके, चूतिया, गांडू, लंड, रंडी, हरामी, कमीना, कुत्ता, साला, भड़वा, चोद, etc.).
-3. HARASSMENT, HATE SPEECH, THREATS, SELF-HARM ENCOURAGEMENT, OR SPAM (category="harassment" | "self_harm_or_threat" | "spam").
-4. ALLOW honest, respectful anonymous emotional stories in English, Hindi, or Hinglish (grief, heartbreak, loneliness, sadness, anxiety, burnout, regret, healing) with NO personal names/PII and NO abusive language.
+3. SEXUAL / NSFW / EROTIC / SUGGESTIVE CONTENT (detectedSexualContent=true, category="sexual_content"):
+   - ZERO tolerance for ANY sexually explicit, erotic, pornographic, NSFW, sexual fantasy, sexual act, nudity/body fetish, masturbation, sexting, hookup/nudes solicitation, or sexually suggestive story in English, Hindi, Hinglish, Devanagari, or any language — EVEN when NO swear words are used and even when phrased subtly or euphemistically (e.g., describing intimate sexual encounters in bed, undressing, arousal, lust, physical desires, seeking partners for a wild night, "make love", "touching my body in bed", "suhagrat", "jism", "hawas", "gandi baat", "bistar garam", "raat bitana", "nangi", "sambhog", "सेक्स", "अश्लील", "संभोग").
+   - Non-graphic emotional healing reflections (loneliness, heartbreak, grief, anxiety, burnout, missing emotional closeness, family stress) WITHOUT sexual descriptions, arousal, nudity, or solicitation ARE ALLOWED.
+4. HARASSMENT, HATE SPEECH, THREATS, SELF-HARM ENCOURAGEMENT, OR SPAM (category="harassment" | "self_harm_or_threat" | "spam").
+5. ALLOW honest, respectful, non-sexual anonymous emotional stories in English, Hindi, or Hinglish with NO personal names/PII and NO abusive language.
 Examples:
-- "Tushar Sharma broke my trust" -> allowed=false, detectedPersonalName=true, detectedAbusiveLanguage=false, category="personal_name_or_pii"
-- "tushar verma is so mean" -> allowed=false, detectedPersonalName=true, detectedAbusiveLanguage=false, category="personal_name_or_pii"
-- "ye sab bhosdike aur chutiye hain" -> allowed=false, detectedPersonalName=false, detectedAbusiveLanguage=true, category="profanity_or_slur"
-- "तुम सब कमीने हो" -> allowed=false, detectedPersonalName=false, detectedAbusiveLanguage=true, category="profanity_or_slur"
-- "I miss someone I used to talk to every night and feel really lonely." -> allowed=true, detectedPersonalName=false, detectedAbusiveLanguage=false, category="clean"
-- "Aaj dil bahut bhari lag raha hai, kisi ko samjha nahi pa raha." -> allowed=true, detectedPersonalName=false, detectedAbusiveLanguage=false, category="clean"
-If blocked, write a brief, gentle 1-sentence reason without repeating the name or profanity.`;
+- "Tushar Sharma broke my trust" -> allowed=false, detectedPersonalName=true, detectedAbusiveLanguage=false, detectedSexualContent=false, category="personal_name_or_pii"
+- "tushar verma is so mean" -> allowed=false, detectedPersonalName=true, detectedAbusiveLanguage=false, detectedSexualContent=false, category="personal_name_or_pii"
+- "ye sab bhosdike aur chutiye hain" -> allowed=false, detectedPersonalName=false, detectedAbusiveLanguage=true, detectedSexualContent=false, category="profanity_or_slur"
+- "तुम सब कमीने हो" -> allowed=false, detectedPersonalName=false, detectedAbusiveLanguage=true, detectedSexualContent=false, category="profanity_or_slur"
+- "Looking for someone to spend a wild passionate night in bed with the lights off and no clothes" -> allowed=false, detectedPersonalName=false, detectedAbusiveLanguage=false, detectedSexualContent=true, category="sexual_content"
+- "Last night we got undressed and got really physical in the bedroom and I loved every second of her body" -> allowed=false, detectedPersonalName=false, detectedAbusiveLanguage=false, detectedSexualContent=true, category="sexual_content"
+- "Aaj raat kisi ladki ke sath garam aur naughty baatein karni hain" -> allowed=false, detectedPersonalName=false, detectedAbusiveLanguage=false, detectedSexualContent=true, category="sexual_content"
+- "I miss someone I used to talk to every night and feel really lonely." -> allowed=true, detectedPersonalName=false, detectedAbusiveLanguage=false, detectedSexualContent=false, category="clean"
+- "Aaj dil bahut bhari lag raha hai, kisi ko samjha nahi pa raha." -> allowed=true, detectedPersonalName=false, detectedAbusiveLanguage=false, detectedSexualContent=false, category="clean"
+If blocked, write a brief, gentle 1-sentence reason without repeating the name, sexual wording, or profanity.`;
 
     const promptParts: string[] = [];
     if (isReply && storyContext) {
@@ -714,6 +721,7 @@ If blocked, write a brief, gentle 1-sentence reason without repeating the name o
               allowed: { type: Type.BOOLEAN },
               detectedPersonalName: { type: Type.BOOLEAN },
               detectedAbusiveLanguage: { type: Type.BOOLEAN },
+              detectedSexualContent: { type: Type.BOOLEAN },
               category: { type: Type.STRING },
               reason: { type: Type.STRING },
             },
@@ -721,6 +729,7 @@ If blocked, write a brief, gentle 1-sentence reason without repeating the name o
               'allowed',
               'detectedPersonalName',
               'detectedAbusiveLanguage',
+              'detectedSexualContent',
               'category',
               'reason',
             ],
@@ -771,20 +780,25 @@ If blocked, write a brief, gentle 1-sentence reason without repeating the name o
         allowed?: boolean;
         detectedPersonalName?: boolean;
         detectedAbusiveLanguage?: boolean;
+        detectedSexualContent?: boolean;
         category?: string;
         reason?: string;
       };
 
       const hasName = parsed.detectedPersonalName === true;
       const hasAbuse = parsed.detectedAbusiveLanguage === true;
-      const isAllowed = parsed.allowed === true && !hasName && !hasAbuse;
+      const hasSexual = parsed.detectedSexualContent === true;
+      const isAllowed =
+        parsed.allowed === true && !hasName && !hasAbuse && !hasSexual;
 
       if (isAllowed) {
         return res.json({ allowed: true, category: 'clean', reason: '' });
       }
 
       let category: ModerationCategory = 'unkind_tone';
-      if (hasName || parsed.category === 'personal_name_or_pii') {
+      if (hasSexual || parsed.category === 'sexual_content') {
+        category = 'sexual_content';
+      } else if (hasName || parsed.category === 'personal_name_or_pii') {
         category = 'personal_name_or_pii';
       } else if (hasAbuse || parsed.category === 'profanity_or_slur') {
         category = 'profanity_or_slur';
@@ -801,7 +815,10 @@ If blocked, write a brief, gentle 1-sentence reason without repeating the name o
 
       let reason = String(parsed.reason || '').trim().slice(0, 260);
       if (!reason) {
-        if (category === 'personal_name_or_pii') {
+        if (category === 'sexual_content') {
+          reason =
+            'Sexually explicit, erotic, or NSFW content is not allowed in Unsaid. This meadow is strictly for gentle emotional healing.';
+        } else if (category === 'personal_name_or_pii') {
           reason =
             'Real personal names or identifying details (including disguised spellings) cannot be shared in the meadow. Please remove the name to protect anonymity.';
         } else if (category === 'profanity_or_slur') {

@@ -15,13 +15,10 @@ import {
   ShieldCheck,
   Monitor,
   Clock,
-  Flower2,
 } from 'lucide-react';
 import {
   LoginEvent,
   ModerationReportRecord,
-  SEED_OPTIONS,
-  Story,
   SUBSCRIPTION_PLAN_CATALOG,
   SubscriptionBillingCycle,
   SubscriptionCurrency,
@@ -44,20 +41,16 @@ import {
 import {
   deleteModerationReportAsAdmin,
   deleteStoryAsAdmin,
-  purgeLegacyGardenStories,
-  subscribeToAllLiveStoriesForAdmin,
 } from '../services/gardenService';
 
 interface AdminBackendModalProps {
   isOpen: boolean;
   currentUser: User | null;
-  stories: Story[];
-  initialTab?: AdminTab;
   onStoryDeleted?: (storyId: string) => void;
   onClose: () => void;
 }
 
-export type AdminTab = 'users' | 'logins' | 'subscriptions' | 'stories' | 'reports';
+export type AdminTab = 'users' | 'logins' | 'subscriptions' | 'reports';
 
 function formatDateTime(date: Date): string {
   return date.toLocaleString(undefined, {
@@ -88,17 +81,14 @@ function formatMoney(amount: number, currency: string): string {
 export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
   isOpen,
   currentUser,
-  stories,
-  initialTab = 'users',
   onStoryDeleted,
   onClose,
 }) => {
-  const [activeTab, setActiveTab] = useState<AdminTab>(initialTab);
+  const [activeTab, setActiveTab] = useState<AdminTab>('users');
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [loginEvents, setLoginEvents] = useState<LoginEvent[]>([]);
   const [subscriptions, setSubscriptions] = useState<SubscriptionRecord[]>([]);
   const [reports, setReports] = useState<ModerationReportRecord[]>([]);
-  const [adminStories, setAdminStories] = useState<Story[] | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | SubscriptionStatus>(
     'all'
@@ -131,19 +121,14 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
     null
   );
   const [backendError, setBackendError] = useState<string | null>(null);
-  const [confirmPurgeLegacy, setConfirmPurgeLegacy] = useState(false);
-  const [isPurgingLegacy, setIsPurgingLegacy] = useState(false);
-  const [purgeLegacyResult, setPurgeLegacyResult] = useState<string | null>(
-    null
-  );
 
   const isAdmin = isVerifiedAdminUser(currentUser);
 
   useEffect(() => {
     if (isOpen) {
-      setActiveTab(initialTab);
+      setActiveTab('users');
     }
-  }, [isOpen, initialTab]);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || !isAdmin) return;
@@ -161,17 +146,12 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
     const unsubEvents = subscribeToAllLoginEvents(setLoginEvents, handleErr);
     const unsubSubs = subscribeToAllSubscriptions(setSubscriptions, handleErr);
     const unsubReports = subscribeToAllReports(setReports, handleErr);
-    const unsubAdminStories = subscribeToAllLiveStoriesForAdmin(
-      setAdminStories,
-      handleErr
-    );
 
     return () => {
       unsubUsers();
       unsubEvents();
       unsubSubs();
       unsubReports();
-      unsubAdminStories();
     };
   }, [isOpen, isAdmin]);
 
@@ -224,28 +204,6 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
       );
     });
   }, [subscriptions, searchQuery, statusFilter]);
-
-  const allAdminStories = adminStories ?? stories;
-
-  const filteredStories = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return allAdminStories;
-    return allAdminStories.filter(
-      (s) =>
-        s.content.toLowerCase().includes(q) ||
-        s.seedType.toLowerCase().includes(q) ||
-        s.contentWarning.toLowerCase().includes(q) ||
-        s.storyId.toLowerCase().includes(q)
-    );
-  }, [allAdminStories, searchQuery]);
-
-  const storyByIdMap = useMemo(() => {
-    const map = new Map<string, Story>();
-    for (const st of allAdminStories) {
-      map.set(st.storyId, st);
-    }
-    return map;
-  }, [allAdminStories]);
 
   const activeSubsCount = useMemo(
     () =>
@@ -527,18 +485,6 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
               >
                 <CreditCard className="w-3.5 h-3.5" />
                 <span>Subscriptions ({subscriptions.length})</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('stories')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
-                  activeTab === 'stories'
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                <Flower2 className="w-3.5 h-3.5" />
-                <span>Stories ({allAdminStories.length})</span>
               </button>
               <button
                 type="button"
@@ -1068,86 +1014,7 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
             </div>
           )}
 
-          {/* TAB 4: PLANTED STORIES MODERATION */}
-          {activeTab === 'stories' && (
-            <div className="space-y-2.5">
-              {filteredStories.length === 0 ? (
-                <div className="p-8 text-center rounded-2xl bg-slate-50 border border-slate-200/70 text-xs text-slate-500">
-                  No planted stories match your search right now.
-                </div>
-              ) : (
-                filteredStories.map((st) => {
-                  const seedMeta = SEED_OPTIONS.find(
-                    (opt) => opt.id === st.seedType
-                  );
-                  const isConfirming = confirmDeleteStoryId === st.storyId;
-                  const isDeleting = deletingStoryId === st.storyId;
-                  return (
-                    <div
-                      key={st.storyId}
-                      className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 p-3.5 rounded-2xl bg-slate-50/90 border border-slate-200/80"
-                    >
-                      <div className="min-w-0 flex-1 space-y-1.5">
-                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
-                          <span className="font-semibold text-slate-800">
-                            {seedMeta?.name || st.seedType} Seed
-                          </span>
-                          <span aria-hidden="true">·</span>
-                          <span>{formatDateTime(st.createdAt)}</span>
-                          <span aria-hidden="true">·</span>
-                          <span className="tabular-nums">
-                            {st.warmthCount} warmth · {st.messageCount} replies
-                          </span>
-                          {st.contentWarning && (
-                            <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-medium">
-                              CW: {st.contentWarning}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs sm:text-sm text-slate-800 leading-relaxed whitespace-pre-wrap break-words">
-                          “{st.content}”
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        {isConfirming && (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteStoryId(null)}
-                            disabled={isDeleting}
-                            className="px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
-                          >
-                            Cancel
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteStory(st.storyId)}
-                          disabled={isDeleting}
-                          className={`px-3 py-1.5 rounded-xl border text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50 whitespace-nowrap ${
-                            isConfirming
-                              ? 'bg-rose-600 text-white border-rose-700'
-                              : 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200'
-                          }`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>
-                            {isDeleting
-                              ? 'Deleting...'
-                              : isConfirming
-                              ? 'Confirm Delete'
-                              : 'Delete Story'}
-                          </span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          )}
-
-          {/* TAB 5: MODERATION REPORTS */}
+          {/* TAB 4: MODERATION REPORTS */}
           {activeTab === 'reports' && (
             <div className="space-y-2.5">
               {reports.length === 0 ? (
@@ -1156,7 +1023,6 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
                 </div>
               ) : (
                 reports.map((rep) => {
-                  const linkedStory = storyByIdMap.get(rep.storyId);
                   const isConfirming = confirmDeleteStoryId === rep.storyId;
                   const isDeleting = deletingStoryId === rep.storyId;
                   const isDismissing = dismissingReportId === rep.reportId;
@@ -1179,16 +1045,17 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
                           Report note: {rep.details}
                         </p>
                       )}
-                      {linkedStory ? (
-                        <p className="p-2.5 rounded-xl bg-white/85 border border-rose-200/70 text-xs text-slate-800 leading-relaxed">
-                          “{linkedStory.content}”
-                        </p>
-                      ) : (
-                        <p className="text-[11px] font-medium text-emerald-700">
-                          This story is no longer in the live meadow.
-                        </p>
-                      )}
                       <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+                        {isConfirming && (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteStoryId(null)}
+                            disabled={isDeleting}
+                            className="px-2.5 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
+                          >
+                            Cancel
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleDismissReport(rep.reportId)}
@@ -1197,27 +1064,25 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
                         >
                           {isDismissing ? 'Dismissing...' : 'Dismiss Report'}
                         </button>
-                        {linkedStory && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteStory(rep.storyId)}
-                            disabled={isDeleting}
-                            className={`px-3 py-1.5 rounded-xl border text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50 ${
-                              isConfirming
-                                ? 'bg-rose-700 text-white border-rose-800'
-                                : 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700'
-                            }`}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>
-                              {isDeleting
-                                ? 'Deleting...'
-                                : isConfirming
-                                ? 'Confirm Delete Story'
-                                : 'Delete Story'}
-                            </span>
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteStory(rep.storyId)}
+                          disabled={isDeleting}
+                          className={`px-3 py-1.5 rounded-xl border text-xs font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors disabled:opacity-50 ${
+                            isConfirming
+                              ? 'bg-rose-700 text-white border-rose-800'
+                              : 'bg-rose-600 hover:bg-rose-700 text-white border-rose-700'
+                          }`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>
+                            {isDeleting
+                              ? 'Deleting...'
+                              : isConfirming
+                              ? 'Confirm Delete Story'
+                              : 'Delete Reported Story'}
+                          </span>
+                        </button>
                       </div>
                     </div>
                   );
@@ -1229,55 +1094,9 @@ export const AdminBackendModal: React.FC<AdminBackendModalProps> = ({
 
         {/* Pinned Footer */}
         <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 px-4 sm:px-7 py-3 bg-white/95 border-t border-slate-200/70">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="text-[11px] text-slate-500">
-              Synced live with Cloud Firestore
-            </span>
-            <button
-              type="button"
-              disabled={isPurgingLegacy}
-              onClick={async () => {
-                if (!confirmPurgeLegacy) {
-                  setConfirmPurgeLegacy(true);
-                  setPurgeLegacyResult(null);
-                  return;
-                }
-                setIsPurgingLegacy(true);
-                setPurgeLegacyResult(null);
-                try {
-                  const res = await purgeLegacyGardenStories();
-                  setPurgeLegacyResult(
-                    res.deletedCount > 0
-                      ? `Deleted ${res.deletedCount} legacy pre-launch stories from Firestore.`
-                      : 'No legacy pre-launch stories found in Firestore.'
-                  );
-                } catch {
-                  setPurgeLegacyResult(
-                    'Could not purge legacy stories. Verify admin sign-in.'
-                  );
-                } finally {
-                  setIsPurgingLegacy(false);
-                  setConfirmPurgeLegacy(false);
-                }
-              }}
-              className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-colors cursor-pointer disabled:opacity-50 ${
-                confirmPurgeLegacy
-                  ? 'bg-rose-600 text-white border-rose-700'
-                  : 'bg-slate-50 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border-slate-200'
-              }`}
-            >
-              {isPurgingLegacy
-                ? 'Purging...'
-                : confirmPurgeLegacy
-                ? 'Click again to delete pre-launch DB stories'
-                : 'Purge Legacy DB Stories'}
-            </button>
-            {purgeLegacyResult && (
-              <span className="text-[11px] font-medium text-emerald-700">
-                {purgeLegacyResult}
-              </span>
-            )}
-          </div>
+          <span className="text-[11px] text-slate-500">
+            Synced live with Cloud Firestore · Anonymous meadow stories are never listed in Backend
+          </span>
           <button
             type="button"
             onClick={onClose}

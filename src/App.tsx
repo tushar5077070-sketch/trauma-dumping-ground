@@ -102,9 +102,6 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
-  const [adminInitialTab, setAdminInitialTab] = useState<'users' | 'stories'>(
-    'users'
-  );
   const [isMySpaceOpen, setIsMySpaceOpen] = useState(false);
   const [isInnerGardenOpen, setIsInnerGardenOpen] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
@@ -995,10 +992,7 @@ export default function App() {
         onStoryDeleted={handleStoryDeleted}
         onSyncOwnPlantedStories={setOwnPlantedStories}
         onClose={() => setIsAccountModalOpen(false)}
-        onOpenAdminConsole={(tab = 'users') => {
-          setAdminInitialTab(tab);
-          setIsAdminModalOpen(true);
-        }}
+        onOpenAdminConsole={() => setIsAdminModalOpen(true)}
         onOpenMySpace={() => setIsMySpaceOpen(true)}
       />
 
@@ -1006,13 +1000,8 @@ export default function App() {
       <AdminBackendModal
         isOpen={isAdminModalOpen}
         currentUser={currentUser}
-        stories={stories}
-        initialTab={adminInitialTab}
         onStoryDeleted={handleStoryDeleted}
-        onClose={() => {
-          setIsAdminModalOpen(false);
-          setAdminInitialTab('users');
-        }}
+        onClose={() => setIsAdminModalOpen(false)}
       />
 
       {/* 9. My Space Personal Sanctuary Dashboard & Five Premium Features */}

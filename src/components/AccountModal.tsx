@@ -48,7 +48,7 @@ interface AccountModalProps {
   onStoryDeleted?: (storyId: string) => void;
   onSyncOwnPlantedStories?: (receipts: PlantedStoryReceipt[]) => void;
   onClose: () => void;
-  onOpenAdminConsole: (initialTab?: 'users' | 'stories') => void;
+  onOpenAdminConsole: () => void;
   onOpenMySpace?: () => void;
 }
 
@@ -455,21 +455,6 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     <p className="text-[11px] text-slate-500 leading-relaxed">
                       Note: Stories planted before self-removal was added were saved with zero account link to protect anonymity, so they cannot be matched to your account automatically.
                     </p>
-                    {isAdmin && stories.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onClose();
-                          onOpenAdminConsole('stories');
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-xs font-medium text-rose-700 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>
-                          Admin: Manage & Remove Any Live Story ({stories.length})
-                        </span>
-                      </button>
-                    )}
                   </div>
                 ) : (
                   <div className="space-y-2.5">
@@ -561,22 +546,6 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                         </div>
                       );
                     })}
-
-                    {isAdmin && stories.length > ownPlantedStories.length && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onClose();
-                          onOpenAdminConsole('stories');
-                        }}
-                        className="w-full py-2 px-3 rounded-xl bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-[11px] font-medium text-slate-700 hover:text-rose-700 inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>
-                          Admin: Manage All {stories.length} Live Meadow Stories
-                        </span>
-                      </button>
-                    )}
                   </div>
                 )}
               </div>

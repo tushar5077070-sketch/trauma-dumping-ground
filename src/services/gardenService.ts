@@ -30,7 +30,6 @@ import {
 } from '../utils/contentModeration';
 
 const LOCAL_FALLBACK_KEY = 'tdg_local_stories_v1';
-const LAST_PLANT_TIMESTAMP_KEY = 'tdg_last_plant_ts';
 
 // Launch-era prefix so pre-launch seeded/test documents are never displayed in the fresh launch meadow
 export const LAUNCH_STORY_ID_PREFIX = 'bloom_';
@@ -367,12 +366,6 @@ export async function plantNewStory(input: PlantStoryInput): Promise<Story> {
     );
   }
 
-  // Rate limiting check (minimum 2.5 seconds between plantings)
-  const lastTs = Number(localStorage.getItem(LAST_PLANT_TIMESTAMP_KEY) || 0);
-  if (Date.now() - lastTs < 2500) {
-    throw new Error('Please take a gentle breath before planting another seed.');
-  }
-
   // Strict sanitization & blueprint validation
   const trimmedContent = input.content.trim().slice(0, 2000);
   if (trimmedContent.length < 5) {
@@ -476,7 +469,6 @@ export async function plantNewStory(input: PlantStoryInput): Promise<Story> {
       createdAt: serverTimestamp(),
     });
     await batch.commit();
-    localStorage.setItem(LAST_PLANT_TIMESTAMP_KEY, String(Date.now()));
     return newStory;
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, docPath);
@@ -506,9 +498,9 @@ function findHarmoniousPosition(existing: Story[]): {
   let bestY = 48;
   let maxMinDist = -1;
 
-  for (let attempt = 0; attempt < 24; attempt++) {
-    const candidateX = Number((6 + Math.random() * 88).toFixed(2));
-    const candidateY = Number((12 + Math.random() * 70).toFixed(2));
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const candidateX = Number((4 + Math.random() * 92).toFixed(2));
+    const candidateY = Number((8 + Math.random() * 76).toFixed(2));
 
     let minDist = 9999;
     for (const s of existing) {
@@ -526,9 +518,9 @@ function findHarmoniousPosition(existing: Story[]): {
   }
 
   // Scale naturally increases closer to the foreground (lower positionY = closer to viewer)
-  const depthFactor = 1 - (bestY - 12) / 76;
+  const depthFactor = 1 - (bestY - 8) / 80;
   const computedScale = Number(
-    Math.max(0.78, Math.min(1.3, 0.8 + depthFactor * 0.48)).toFixed(2)
+    Math.max(0.75, Math.min(1.28, 0.78 + depthFactor * 0.46)).toFixed(2)
   );
 
   return { positionX: bestX, positionY: bestY, scale: computedScale };

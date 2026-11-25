@@ -20,7 +20,7 @@ import { checkSupportiveReplyLocal } from '../utils/contentModeration';
 
 const NOTIFICATION_STATE_DOC_ID = 'inbox';
 const MAX_STORED_READ_IDS = 180;
-const MAX_WATCHED_STORIES = 25;
+const MAX_WATCHED_STORIES = 100;
 
 function localStorageKey(userId: string): string {
   return `unsaid_notif_read_state_v1_${userId}`;
@@ -261,16 +261,23 @@ export function subscribeToOwnStoryKindMessages(
     initialLoadComplete: boolean
   ) => void
 ): () => void {
-  const receiptsToWatch = ownPlantedStories.slice(0, MAX_WATCHED_STORIES);
+  const liveStoryMap = new Map<string, Story>();
+  for (const s of liveStories) {
+    liveStoryMap.set(s.storyId, s);
+  }
+
+  // Prioritize still-live planted stories first so notifications keep working even when a user plants many seeds
+  const prioritizedReceipts = [...ownPlantedStories].sort((a, b) => {
+    const aLive = liveStoryMap.has(a.storyId) ? 1 : 0;
+    const bLive = liveStoryMap.has(b.storyId) ? 1 : 0;
+    if (aLive !== bLive) return bLive - aLive;
+    return b.createdAt.getTime() - a.createdAt.getTime();
+  });
+  const receiptsToWatch = prioritizedReceipts.slice(0, MAX_WATCHED_STORIES);
 
   if (receiptsToWatch.length === 0) {
     onUpdate([], true);
     return () => {};
-  }
-
-  const liveStoryMap = new Map<string, Story>();
-  for (const s of liveStories) {
-    liveStoryMap.set(s.storyId, s);
   }
 
   const messagesByStory = new Map<string, KindMessageNotification[]>();

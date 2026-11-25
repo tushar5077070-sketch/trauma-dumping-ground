@@ -50,6 +50,10 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [phase, setPhase] = useState<PlantingPhase>('writing');
   const [plantedStory, setPlantedStory] = useState<Story | null>(null);
+  const [sessionPlantedStories, setSessionPlantedStories] = useState<Story[]>(
+    []
+  );
+  const [useInitialTarget, setUseInitialTarget] = useState(true);
 
   useEffect(() => {
     if (isOpen) {
@@ -58,6 +62,9 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
       setAuthError(null);
       setIsSigningIn(false);
       setIsSubmitting(false);
+      setPlantedStory(null);
+      setSessionPlantedStories([]);
+      setUseInitialTarget(true);
     }
   }, [isOpen]);
 
@@ -124,14 +131,24 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
 
     setIsSubmitting(true);
     try {
+      const mergedExisting = [...existingStories];
+      for (const s of sessionPlantedStories) {
+        if (!mergedExisting.some((e) => e.storyId === s.storyId)) {
+          mergedExisting.push(s);
+        }
+      }
+
       const created = await plantNewStory({
         content,
         seedType: selectedSeed,
         contentWarning: showContentWarningInput ? contentWarning : '',
-        existingStories,
-        targetFlower,
+        existingStories: mergedExisting,
+        targetFlower: useInitialTarget ? targetFlower : null,
       });
       setPlantedStory(created);
+      setSessionPlantedStories((prev) => [...prev, created]);
+      setUseInitialTarget(false);
+      onStoryPlanted(created);
       soundscape.playBloomChord();
       setPhase('seed-falling');
     } catch (err) {
@@ -150,13 +167,23 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
     }
   };
 
-  const handleReturnToGarden = () => {
-    if (plantedStory) {
-      onStoryPlanted(plantedStory);
-    }
+  const handlePlantAnother = () => {
     setContent('');
     setContentWarning('');
     setShowContentWarningInput(false);
+    setErrorMsg(null);
+    setPlantedStory(null);
+    setIsSubmitting(false);
+    setUseInitialTarget(false);
+    setPhase('writing');
+  };
+
+  const handleReturnToGarden = () => {
+    setContent('');
+    setContentWarning('');
+    setShowContentWarningInput(false);
+    setPlantedStory(null);
+    setIsSubmitting(false);
     onClose();
   };
 
@@ -251,6 +278,10 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
             <div>
               <p className="text-[11px] sm:text-xs font-medium text-slate-500">
                 {currentSeed.numberLabel} · {currentSeed.name} · Completely Anonymous
+                {sessionPlantedStories.length > 0 &&
+                  ` · ${sessionPlantedStories.length} ${
+                    sessionPlantedStories.length === 1 ? 'seed' : 'seeds'
+                  } planted`}
               </p>
               <h2
                 id="write-story-heading"
@@ -471,13 +502,22 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
                 <p className="text-xs text-slate-500 mt-1.5">
                   Planting {currentSeed.name} · Anonymous bloom
                 </p>
-                <button
-                  type="button"
-                  onClick={handleReturnToGarden}
-                  className="mt-2.5 text-[11px] font-medium text-slate-500 hover:text-slate-800 underline underline-offset-4 transition-colors cursor-pointer"
-                >
-                  Return to Garden now
-                </button>
+                <div className="mt-2.5 flex flex-wrap items-center justify-center gap-4">
+                  <button
+                    type="button"
+                    onClick={handlePlantAnother}
+                    className="text-[11px] font-medium text-emerald-700 hover:text-emerald-900 underline underline-offset-4 transition-colors cursor-pointer"
+                  >
+                    Plant another seed
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleReturnToGarden}
+                    className="text-[11px] font-medium text-slate-500 hover:text-slate-800 underline underline-offset-4 transition-colors cursor-pointer"
+                  >
+                    Return to Garden now
+                  </button>
+                </div>
               </>
             ) : (
               <div className="space-y-2">
@@ -485,9 +525,19 @@ export const WriteStoryModal: React.FC<WriteStoryModalProps> = ({
                   Your story has found a place to grow.
                 </h3>
                 <p className="text-sm text-slate-600">
-                  Thank you for planting your seed.
+                  {sessionPlantedStories.length > 1
+                    ? `You've planted ${sessionPlantedStories.length} seeds in the meadow. Plant as many as your heart needs.`
+                    : 'Thank you for planting your seed. You can plant as many seeds as you want.'}
                 </p>
-                <div className="pt-3">
+                <div className="pt-3 flex flex-wrap items-center justify-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handlePlantAnother}
+                    className="px-5 py-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 text-xs font-medium inline-flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                  >
+                    <Sprout className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Plant Another Seed</span>
+                  </button>
                   <button
                     type="button"
                     onClick={handleReturnToGarden}
